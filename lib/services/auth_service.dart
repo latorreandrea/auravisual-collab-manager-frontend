@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 
 /// Authentication service
@@ -29,11 +30,11 @@ class AuthService {
         
         // Store authentication token
         final token = data['access_token'] as String?;
-        // if (token != null) {
-        //   // TODO: Store token using secure storage
-        //   // await _storeToken(token);
-        //   print('Token received: $token'); // Temporary debug print
-        // }
+        if (token != null) {
+          // TODO: Store token using secure storage
+          // await _storeToken(token);
+          debugPrint('Token received: $token'); // Temporary debug print - USANDO la variabile token
+        }
         
         return true;
       } else {

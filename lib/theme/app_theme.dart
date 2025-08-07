@@ -4,11 +4,19 @@ import 'package:flutter/material.dart';
 /// Centralizing theme makes it easy to maintain consistent styling
 class AppTheme {
   // Primary color palette for the app
-  static const Color primaryColor = Color(0xFF6366F1); // Indigo
-  static const Color secondaryColor = Color(0xFF8B5CF6); // Purple
-  static const Color surfaceColor = Color(0xFFF8FAFC); // Light gray
+  static const Color primaryColor = Color.fromARGB(255, 0, 3, 134); // Indigo
+  static const Color secondaryColor = Color.fromRGBO(19,113,245,1.000); // Purple
+  static const Color surfaceColor = Color.fromRGBO(248,249,251,1.000); // Light gray
   static const Color errorColor = Color(0xFFEF4444); // Red
   
+  // Gradient colors (aggiungi queste costanti mancanti)
+  static const Color gradientStart = Color.fromRGBO(51,56,124,1.000); // Same as primaryColor
+  static const Color gradientEnd = Color.fromRGBO(39,175,155,1.000); // Same as secondaryColor
+  static const Color darkColor = Color(0xFF1F2937); // Dark gray for text
+  
+  static const Color lightColor = Color(0xFFF8FAFC); // Light background - same as surfaceColor
+  static const Color whiteColor = Color(0xFFFFFFFF); // Pure white
+
   /// Light theme configuration
   static ThemeData get lightTheme {
     return ThemeData(

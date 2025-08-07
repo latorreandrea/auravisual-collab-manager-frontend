@@ -1,64 +1,95 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
+import '../theme/app_theme.dart';
 
-/// Reusable app logo widget
-/// Can be used across different screens
+/// Reusable app logo widget using actual AuraVisual logo
 class AppLogo extends StatelessWidget {
-  const AppLogo({super.key});
+  const AppLogo({
+    super.key,
+    this.height = 100, 
+    this.showText = false,
+  });
+
+  final double height; 
+  final bool showText;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Logo container with decoration
+        // Horizontal logo container that takes full width
         Container(
-          height: 120,
-          width: 120,
-          decoration: BoxDecoration(
-            // Use theme colors instead of hardcoded values
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Theme.of(context).colorScheme.secondary,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+          width: double.infinity,
+          constraints: BoxConstraints(
+            maxHeight: height, 
+            minHeight: 60, // Minimum height for smaller screens
+          ),
+          
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.asset(
+              'assets/images/logo.png',
+              fit: BoxFit.contain, // Maintains proportions, shows entire logo
+              width: double.infinity,
+              errorBuilder: (context, error, stackTrace) {
+                // Fallback with fixed height
+                return Container(
+                  height: height, // Use 'height' instead of 'maxHeight'
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppTheme.gradientStart,
+                        AppTheme.gradientEnd,
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                  ),
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.visibility,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'AURAVISUAL',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-            borderRadius: BorderRadius.circular(20),
-            // Add subtle shadow for depth - Fixed deprecated withOpacity
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.visibility,
-            size: 60,
-            color: Colors.white,
           ),
         ),
         
-        const SizedBox(height: AppConstants.defaultSpacing),
-        
-        // App name with consistent styling
-        Text(
-          'Auravisual',
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
+        if (showText) ...[
+          const SizedBox(height: AppConstants.smallSpacing),
+          
+          // Subtitle text (optional)
+          Text(
+            'Collab Manager',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppTheme.primaryColor, 
+              fontWeight: FontWeight.bold, 
+              fontSize: 20, 
+            ),
           ),
-        ),
-        
-        Text(
-          'Collab Manager',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            // Fixed deprecated withOpacity
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-          ),
-        ),
+        ],
+      
+        // Spacing below the logo
+        const SizedBox(height: AppConstants.extraLargeSpacing),
       ],
     );
   }

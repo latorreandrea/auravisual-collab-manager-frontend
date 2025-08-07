@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../utils/constants.dart';
 import '../utils/validators.dart';
+import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
 
 /// Login form widget with state management
@@ -95,20 +96,22 @@ class _LoginFormState extends State<LoginForm> {
     return Form(
       key: _formKey,
       child: Column(
+        mainAxisSize: MainAxisSize.min, // Takes minimum space needed
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Email input field
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next, // Shows "next" button on keyboard
-            enabled: !_isLoading, // Disable input during loading
+            textInputAction: TextInputAction.next,
+            enabled: !_isLoading,
             decoration: const InputDecoration(
               labelText: 'Email',
               hintText: 'Enter your email address',
               prefixIcon: Icon(Icons.email_outlined),
+              contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
             ),
-            validator: Validators.email, // Reusable email validator
+            validator: Validators.email,
           ),
           
           const SizedBox(height: AppConstants.defaultSpacing),
@@ -116,14 +119,15 @@ class _LoginFormState extends State<LoginForm> {
           // Password input field
           TextFormField(
             controller: _passwordController,
-            obscureText: !_isPasswordVisible, // Toggle password visibility
-            textInputAction: TextInputAction.done, // Shows "done" button
+            obscureText: !_isPasswordVisible,
+            textInputAction: TextInputAction.done,
             enabled: !_isLoading,
-            onFieldSubmitted: (_) => _handleLogin(), // Login when user presses "done"
+            onFieldSubmitted: (_) => _handleLogin(),
             decoration: InputDecoration(
               labelText: 'Password',
               hintText: 'Enter your password',
               prefixIcon: const Icon(Icons.lock_outlined),
+              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
               suffixIcon: IconButton(
                 icon: Icon(
                   _isPasswordVisible 
@@ -137,34 +141,40 @@ class _LoginFormState extends State<LoginForm> {
                 },
               ),
             ),
-            validator: Validators.password, // Reusable password validator
+            validator: Validators.password,
           ),
           
           const SizedBox(height: AppConstants.largeSpacing),
           
           // Login button
-          ElevatedButton(
-            onPressed: _isLoading ? null : _handleLogin, // Disable when loading
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
+          SizedBox(
+            height: 56, // Fixed height for better touch target
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _handleLogin,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.gradientEnd,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: _isLoading
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text(
+                      'Login',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
             ),
-            child: _isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
           ),
           
           const SizedBox(height: AppConstants.defaultSpacing),
@@ -172,7 +182,6 @@ class _LoginFormState extends State<LoginForm> {
           // Register link
           TextButton(
             onPressed: _isLoading ? null : () {
-              // TODO: Navigate to registration screen
               _showSnackBar('Registration screen coming soon!', isError: false);
             },
             child: Text(

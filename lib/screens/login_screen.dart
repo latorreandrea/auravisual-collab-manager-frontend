@@ -2,49 +2,57 @@ import 'package:flutter/material.dart';
 import '../widgets/login_form.dart';
 import '../widgets/app_logo.dart';
 import '../utils/constants.dart';
+import '../theme/app_theme.dart';
 
-/// Login screen widget
-/// This is a StatelessWidget because it doesn't manage state directly
-/// State management is handled by child widgets (LoginForm)
+/// Login screen with AuraVisual branding - Full height layout
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Background color for the entire screen
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      
-      // SafeArea ensures content doesn't overlap with system UI (status bar, notches)
-      body: SafeArea(
-        child: SingleChildScrollView(
-          // Add padding around the content
-          padding: const EdgeInsets.all(AppConstants.defaultPadding),
-          
-          child: ConstrainedBox(
-            // Ensure the content takes at least the full screen height
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height - 
-                         MediaQuery.of(context).padding.top - 
-                         MediaQuery.of(context).padding.bottom,
+      // Remove any potential scrolling issues
+      resizeToAvoidBottomInset: true,
+      body: Container(
+        // Takes full screen height and width
+        width: double.infinity,
+        height: MediaQuery.of(context).size.height,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppTheme.lightColor,
+              AppTheme.whiteColor,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppConstants.defaultPadding,
+              vertical: AppConstants.smallPadding,
             ),
-            
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center, // Centra tutto verticalmente
               children: [
-                // Spacer to push content toward center
-                SizedBox(height: AppConstants.largeSpacing),
+                // Spacer superiore ridotto
+                const Spacer(flex: 1),
                 
-                // App logo component (separated for reusability)
-                AppLogo(),
+                // Logo section - takes full width
+                const AppLogo(
+                  height: 120, // Increased height for better visibility
+                  showText: true,
+                ),
                 
-                SizedBox(height: AppConstants.extraLargeSpacing),
+                // Spacing between logo and form
+                const SizedBox(height: AppConstants.extraLargeSpacing),
                 
-                // Login form component
-                LoginForm(),
+                // Login form section - non più flexible, dimensione naturale
+                const LoginForm(),
                 
-                SizedBox(height: AppConstants.defaultSpacing),
+                // Spacer inferiore più grande per bilanciare
+                const Spacer(flex: 2),
               ],
             ),
           ),
