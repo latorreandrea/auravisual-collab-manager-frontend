@@ -48,3 +48,9 @@ windows/
 macos/
 web/
 .metadata
+
+
+# to manage the secrets
+.env
+devtools_options.yaml
+.vscode/launch.json

@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
+import 'utils/constants.dart';
 
 /// The main entry point of the application
 /// This function is called when the app starts
 void main() {
+  // Print configuration for debugging
+  print('🔧 App Configuration:');
+  print('   Environment: ${AppConstants.environment}');
+  print('   Base URL: ${AppConstants.baseUrl}');
+  print('   Debug Mode: ${AppConstants.isDebug}');
+  print('   Login URL: ${AppConstants.baseUrl}${AppConstants.loginEndpoint}');
+  
   runApp(const AuravisualApp());
 }
 
@@ -31,8 +39,8 @@ class AuravisualApp extends StatelessWidget {
       // Starting screen of the app
       home: const LoginScreen(),
       
-      // Remove debug banner in top-right corner
-      debugShowCheckedModeBanner: false,
+      // Show debug banner only in development
+      debugShowCheckedModeBanner: AppConstants.isDebug,
       
       // App-wide navigation routes (we'll add more screens later)
       routes: {

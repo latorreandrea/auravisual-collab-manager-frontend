@@ -3,10 +3,10 @@ import '../utils/constants.dart';
 import '../utils/validators.dart';
 import '../theme/app_theme.dart';
 import '../services/auth_service.dart';
+import '../screens/welcome_screen.dart';
 
 /// Login form widget with state management
-/// This is a StatefulWidget because it needs to manage form state,
-/// loading states, and user input
+/// Handles authentication with the FastAPI backend
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
 
@@ -15,30 +15,28 @@ class LoginForm extends StatefulWidget {
 }
 
 class _LoginFormState extends State<LoginForm> {
-  // Form key for validation - allows us to validate the entire form at once
+  // Form key for validation
   final _formKey = GlobalKey<FormState>();
   
-  // Text controllers to get values from input fields
+  // Text controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   
   // State variables
-  bool _isPasswordVisible = false; // Controls password visibility toggle
-  bool _isLoading = false; // Controls loading state during API calls
+  bool _isPasswordVisible = false;
+  bool _isLoading = false;
   
-  // Service for authentication (we'll create this)
+  // Service for authentication
   final _authService = AuthService();
 
   @override
   void dispose() {
-    // Clean up controllers when widget is removed from widget tree
-    // This prevents memory leaks
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  /// Handles the login process
+  /// Handles the login process with real API integration
   Future<void> _handleLogin() async {
     // Validate form before proceeding
     if (!(_formKey.currentState?.validate() ?? false)) {
@@ -55,18 +53,37 @@ class _LoginFormState extends State<LoginForm> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Call authentication service
-      final success = await _authService.login(email, password);
+      // Call authentication service with real API
+      final user = await _authService.login(email, password);
 
-      if (success && mounted) {
-        // Login successful - navigate to dashboard
-        // TODO: Navigate to dashboard screen
-        _showSnackBar('Login successful!', isError: false);
-      }
-    } catch (error) {
-      // Handle login error
       if (mounted) {
-        _showSnackBar('Login failed: ${error.toString()}', isError: true);
+        // Login successful - navigate to welcome screen
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => WelcomeScreen(user: user),
+          ),
+        );
+      }
+      
+    } catch (error) {
+      // Handle login error with user-friendly messages
+      if (mounted) {
+        String errorMessage = error.toString();
+        
+        // Customize error messages based on content
+        if (errorMessage.contains('Invalid email or password') || 
+            errorMessage.contains('Invalid credentials')) {
+          errorMessage = 'Invalid email or password. Please try again.';
+        } else if (errorMessage.contains('Connection error') || 
+                   errorMessage.contains('Network')) {
+          errorMessage = 'Connection problem. Please check your internet connection.';
+        } else if (errorMessage.contains('Server response error')) {
+          errorMessage = 'Server is temporarily unavailable. Please try again later.';
+        } else if (errorMessage.contains('Exception: ')) {
+          errorMessage = errorMessage.replaceFirst('Exception: ', '');
+        }
+        
+        _showSnackBar(errorMessage, isError: true);
       }
     } finally {
       // Hide loading state
@@ -85,8 +102,14 @@ class _LoginFormState extends State<LoginForm> {
         content: Text(message),
         backgroundColor: isError 
           ? Theme.of(context).colorScheme.error
-          : Colors.green,
+          : AppTheme.gradientEnd,
         behavior: SnackBarBehavior.floating,
+        action: isError ? SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {},
+        ) : null,
+        duration: Duration(seconds: isError ? 4 : 2),
       ),
     );
   }
@@ -96,7 +119,7 @@ class _LoginFormState extends State<LoginForm> {
     return Form(
       key: _formKey,
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Takes minimum space needed
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Email input field
@@ -134,7 +157,7 @@ class _LoginFormState extends State<LoginForm> {
                     ? Icons.visibility_off_outlined 
                     : Icons.visibility_outlined,
                 ),
-                onPressed: () {
+                onPressed: _isLoading ? null : () {
                   setState(() {
                     _isPasswordVisible = !_isPasswordVisible;
                   });
@@ -148,7 +171,7 @@ class _LoginFormState extends State<LoginForm> {
           
           // Login button
           SizedBox(
-            height: 56, // Fixed height for better touch target
+            height: 56,
             child: ElevatedButton(
               onPressed: _isLoading ? null : _handleLogin,
               style: ElevatedButton.styleFrom(
@@ -157,6 +180,7 @@ class _LoginFormState extends State<LoginForm> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
+                elevation: 2,
               ),
               child: _isLoading
                   ? const SizedBox(
@@ -179,13 +203,13 @@ class _LoginFormState extends State<LoginForm> {
           
           const SizedBox(height: AppConstants.defaultSpacing),
           
-          // Register link
+          // Register hint
           TextButton(
             onPressed: _isLoading ? null : () {
-              _showSnackBar('Registration screen coming soon!', isError: false);
+              _showSnackBar('Contact your administrator to create an account', isError: false);
             },
             child: Text(
-              'Don\'t have an account? Sign up',
+              'Need an account? Contact admin',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.primary,
               ),
