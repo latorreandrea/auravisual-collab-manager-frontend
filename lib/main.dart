@@ -6,13 +6,6 @@ import 'utils/constants.dart';
 /// The main entry point of the application
 /// This function is called when the app starts
 void main() {
-  // Print configuration for debugging
-  print('🔧 App Configuration:');
-  print('   Environment: ${AppConstants.environment}');
-  print('   Base URL: ${AppConstants.baseUrl}');
-  print('   Debug Mode: ${AppConstants.isDebug}');
-  print('   Login URL: ${AppConstants.baseUrl}${AppConstants.loginEndpoint}');
-  
   runApp(const AuravisualApp());
 }
 

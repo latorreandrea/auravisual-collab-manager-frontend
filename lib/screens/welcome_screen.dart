@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
-import 'login_screen.dart';
+import '../widgets/app_nav_bar.dart';
 
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
@@ -20,7 +19,6 @@ class WelcomeScreen extends StatelessWidget {
     return Scaffold(
       body: Container(
         width: double.infinity,
-        height: double.infinity,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -32,18 +30,39 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(AppConstants.defaultPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Top bar with logout
-                _buildTopBar(context),
-                
-                // Main welcome content
-                Expanded(
-                  child: _buildWelcomeContent(context),
+                // Reusable Navigation Bar
+                AppNavBar(
+                  user: user,
+                  onHomePressed: () => _refreshPage(context),
+                  onProfilePressed: () => _showComingSoon(context, 'Profile feature coming soon! 👤'),
                 ),
+                
+                const SizedBox(height: 40),
+                
+                // Avatar
+                _buildUserAvatar(),
+                
+                const SizedBox(height: 32),
+                
+                // Welcome message
+                _buildWelcomeMessage(context),
+                
+                const SizedBox(height: 32),
+                
+                // Insights card
+                _buildInsightsCard(context),
+                
+                const SizedBox(height: 24),
+                
+                // Quick actions
+                _buildQuickActions(context),
+                
+                const SizedBox(height: 40),
                 
                 // Bottom section
                 _buildBottomSection(context),
@@ -55,59 +74,21 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // App title
-        Text(
-          'Auravisual',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            color: AppTheme.primaryColor,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        
-        // Logout button
-        IconButton(
-          onPressed: () => _handleLogout(context),
-          icon: const Icon(Icons.logout),
-          color: AppTheme.primaryColor,
-          tooltip: 'Logout',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWelcomeContent(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Welcome icon/avatar
-        _buildUserAvatar(),
-        
-        const SizedBox(height: AppConstants.extraLargeSpacing),
-        
-        // Welcome message
-        _buildWelcomeMessage(context),
-        
-        const SizedBox(height: AppConstants.largeSpacing),
-        
-        // User info card
-        _buildUserInfoCard(context),
-        
-        const SizedBox(height: AppConstants.extraLargeSpacing),
-        
-        // Quick actions (placeholder for future features)
-        _buildQuickActions(context),
-      ],
+  void _refreshPage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Welcome screen refreshed! 🔄'),
+        backgroundColor: AppTheme.gradientEnd,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
   Widget _buildUserAvatar() {
     return Container(
-      width: 120,
-      height: 120,
+      width: 72,
+      height: 72,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -121,8 +102,8 @@ class WelcomeScreen extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: AppTheme.primaryColor.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -133,7 +114,7 @@ class WelcomeScreen extends StatelessWidget {
             : 'U',
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 48,
+            fontSize: 32,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -153,7 +134,7 @@ class WelcomeScreen extends StatelessWidget {
           textAlign: TextAlign.center,
         ),
         
-        const SizedBox(height: AppConstants.smallSpacing),
+        const SizedBox(height: 8),
         
         Text(
           user.displayName,
@@ -166,12 +147,12 @@ class WelcomeScreen extends StatelessWidget {
         
         // Show role only if not client
         if (user.shouldShowRole) ...[
-          const SizedBox(height: AppConstants.smallSpacing),
+          const SizedBox(height: 12),
           
           Container(
             padding: const EdgeInsets.symmetric(
-              horizontal: AppConstants.defaultSpacing,
-              vertical: AppConstants.smallSpacing,
+              horizontal: 16,
+              vertical: 8,
             ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -199,58 +180,71 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUserInfoCard(BuildContext context) {
-    return Card(
-      elevation: 8,
-      shadowColor: AppTheme.primaryColor.withValues(alpha: 0.2),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.person_outline,
-                  color: AppTheme.primaryColor,
-                  size: 24,
-                ),
-                const SizedBox(width: AppConstants.smallSpacing),
-                Text(
-                  'Account Information',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+  Widget _buildInsightsCard(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 0),
+      child: Card(
+        elevation: 8,
+        shadowColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.insights_outlined,
                     color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
+                    size: 24,
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Insights',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Show insights based on user role
+              if (user.isAdmin) ...[
+                _buildInsightRow('Clients', 'TODO: total clients'),
+                _buildInsightRow('Projects', 'TODO: total projects'),
+                _buildInsightRow('Active Tasks', 'TODO: active tasks'),
+                _buildInsightRow('Tickets', 'TODO: total tickets'),
+              ] else if (user.isStaff) ...[
+                _buildInsightRow('Projects', 'TODO: total projects'),
+                _buildInsightRow('Completed Tasks', 'TODO: completed tasks'),
+                _buildInsightRow('Pending Tasks', 'TODO: tasks to complete'),
+              ] else if (user.isClient) ...[
+                _buildInsightRow('Project(s)', 'TODO: project names'),
+                _buildInsightRow('Subscribed Projects', 'TODO: number of projects'),
+                _buildInsightRow('Plan', 'TODO: plan name'),
+                _buildInsightRow('Open Tasks', 'TODO: open tasks'),
               ],
-            ),
-            
-            const SizedBox(height: AppConstants.defaultSpacing),
-            
-            _buildInfoRow('Email', user.email),
-            if (user.username != null)
-              _buildInfoRow('Username', user.username!),
-            _buildInfoRow('Status', user.isActive ? 'Active' : 'Inactive'),
-            if (user.createdAt != null)
-              _buildInfoRow('Member since', _formatDate(user.createdAt!)),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInsightRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppConstants.smallSpacing),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 140,
             child: Text(
               '$label:',
               style: TextStyle(
@@ -275,53 +269,56 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Card(
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.dashboard_outlined,
-                  color: AppTheme.primaryColor,
-                  size: 24,
-                ),
-                const SizedBox(width: AppConstants.smallSpacing),
-                Text(
-                  'Quick Actions',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+    return Container(
+      width: double.infinity,
+      child: Card(
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.dashboard_outlined,
                     color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.bold,
+                    size: 24,
                   ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: AppConstants.defaultSpacing),
-            
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildActionButton(
-                  icon: Icons.folder_outlined,
-                  label: 'Projects',
-                  onTap: () => _showComingSoon(context),
-                ),
-                _buildActionButton(
-                  icon: Icons.task_outlined,
-                  label: 'Tasks',
-                  onTap: () => _showComingSoon(context),
-                ),
-                _buildActionButton(
-                  icon: Icons.people_outlined,
-                  label: 'Team',
-                  onTap: () => _showComingSoon(context),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 8),
+                  Text(
+                    'Quick Actions',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppTheme.primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildActionButton(
+                    icon: Icons.folder_outlined,
+                    label: 'Projects',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.task_outlined,
+                    label: 'Tasks',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                  _buildActionButton(
+                    icon: Icons.people_outlined,
+                    label: 'Team',
+                    onTap: () => _showComingSoon(context),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -337,13 +334,13 @@ class WelcomeScreen extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: Container(
         padding: const EdgeInsets.symmetric(
-          vertical: AppConstants.defaultSpacing,
-          horizontal: AppConstants.smallSpacing,
+          vertical: 16,
+          horizontal: 12,
         ),
         child: Column(
           children: [
             Container(
-              padding: const EdgeInsets.all(AppConstants.defaultSpacing),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: AppTheme.gradientEnd.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
@@ -354,7 +351,7 @@ class WelcomeScreen extends StatelessWidget {
                 size: 28,
               ),
             ),
-            const SizedBox(height: AppConstants.smallSpacing),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
@@ -379,7 +376,7 @@ class WelcomeScreen extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        const SizedBox(height: AppConstants.smallSpacing),
+        const SizedBox(height: 8),
         Text(
           'Ready to collaborate!',
           style: TextStyle(
@@ -392,45 +389,13 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    
-    return '${months[date.month - 1]} ${date.year}';
-  }
-
-  void _showComingSoon(BuildContext context) {
+  void _showComingSoon(BuildContext context, [String? customMessage]) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Feature coming soon! 🚀'),
+      SnackBar(
+        content: Text(customMessage ?? 'Feature coming soon! 🚀'),
         backgroundColor: AppTheme.gradientEnd,
         behavior: SnackBarBehavior.floating,
       ),
     );
-  }
-
-  Future<void> _handleLogout(BuildContext context) async {
-    try {
-      await AuthService().logout();
-      
-      if (context.mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => const LoginScreen(),
-          ),
-        );
-      }
-    } catch (error) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Logout error: $error'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
   }
 }
