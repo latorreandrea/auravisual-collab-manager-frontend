@@ -3,6 +3,7 @@ import '../models/user.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../widgets/app_nav_bar.dart';
+import 'team_screen.dart';
 
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
@@ -269,7 +270,7 @@ class WelcomeScreen extends StatelessWidget {
   }
 
   Widget _buildQuickActions(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: Card(
         elevation: 4,
@@ -313,7 +314,7 @@ class WelcomeScreen extends StatelessWidget {
                   _buildActionButton(
                     icon: Icons.people_outlined,
                     label: 'Team',
-                    onTap: () => _showComingSoon(context),
+                    onTap: () => _openTeamScreen(context),
                   ),
                 ],
               ),
@@ -397,5 +398,39 @@ class WelcomeScreen extends StatelessWidget {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  void _openTeamScreen(BuildContext context) {
+    if (user.isAdmin) {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => TeamScreen(user: user),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = 0.0;
+            const end = 1.0;
+            const curve = Curves.elasticOut;
+
+            var scaleAnimation = Tween(begin: begin, end: end).animate(
+              CurvedAnimation(parent: animation, curve: curve),
+            );
+
+            var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+            );
+
+            return ScaleTransition(
+              scale: scaleAnimation,
+              child: FadeTransition(
+                opacity: fadeAnimation,
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
+    } else {
+      _showComingSoon(context, 'Team management is only available for administrators! 🔒');
+    }
   }
 }
