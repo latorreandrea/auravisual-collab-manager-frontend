@@ -108,52 +108,6 @@ class TeamMember {
     };
   }
 
-  /// Mock data for testing - only use if API fails
-  static List<TeamMember> getMockData() {
-    return [
-      const TeamMember(
-        id: '1',
-        name: 'Sarah Johnson',
-        email: 'sarah@auravisual.dk',
-        role: 'Senior Developer',
-        activeTasks: 4,
-        totalTasks: 8,
-      ),
-      const TeamMember(
-        id: '2',
-        name: 'Marco Rossi',
-        email: 'marco@auravisual.dk',
-        role: 'UI/UX Designer',
-        activeTasks: 2,
-        totalTasks: 5,
-      ),
-      const TeamMember(
-        id: '3',
-        name: 'Anna Chen',
-        email: 'anna@auravisual.dk',
-        role: 'Project Manager',
-        activeTasks: 7,
-        totalTasks: 12,
-      ),
-      const TeamMember(
-        id: '4',
-        name: 'David Smith',
-        email: 'david@auravisual.dk',
-        role: 'Developer',
-        activeTasks: 0,
-        totalTasks: 3,
-      ),
-      const TeamMember(
-        id: '5',
-        name: 'Lisa Anderson',
-        email: 'lisa@auravisual.dk',
-        role: 'QA Engineer',
-        activeTasks: 3,
-        totalTasks: 6,
-      ),
-    ];
-  }
-
   @override
   String toString() {
     return 'TeamMember(id: $id, name: $name, email: $email, role: $role, '

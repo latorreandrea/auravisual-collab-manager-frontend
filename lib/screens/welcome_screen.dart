@@ -4,7 +4,7 @@ import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../widgets/app_nav_bar.dart';
 import 'team_screen.dart';
-
+import 'projects_screen.dart';
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
 class WelcomeScreen extends StatelessWidget {
@@ -304,7 +304,7 @@ class WelcomeScreen extends StatelessWidget {
                   _buildActionButton(
                     icon: Icons.folder_outlined,
                     label: 'Projects',
-                    onTap: () => _showComingSoon(context),
+                    onTap: () => _openProjectsScreen(context), // Modifica questa riga
                   ),
                   _buildActionButton(
                     icon: Icons.task_outlined,
@@ -388,6 +388,40 @@ class WelcomeScreen extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  void _openProjectsScreen(BuildContext context) {
+    if (user.isAdmin) {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => ProjectsScreen(user: user),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = 0.0;
+            const end = 1.0;
+            const curve = Curves.elasticOut;
+
+            var scaleAnimation = Tween(begin: begin, end: end).animate(
+              CurvedAnimation(parent: animation, curve: curve),
+            );
+
+            var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+            );
+
+            return ScaleTransition(
+              scale: scaleAnimation,
+              child: FadeTransition(
+                opacity: fadeAnimation,
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 800),
+        ),
+      );
+    } else {
+      _showComingSoon(context, 'Project management is only available for administrators! 🔒');
+    }
   }
 
   void _showComingSoon(BuildContext context, [String? customMessage]) {
