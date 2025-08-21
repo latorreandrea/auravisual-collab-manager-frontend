@@ -1,34 +1,34 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../models/team_member.dart';
-import '../services/staff_service.dart';
+import '../models/client.dart';
+import '../services/client_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../widgets/app_nav_bar.dart';
-import 'clients_screen.dart';
+import 'create_client_screen.dart';
 
-/// Team screen - shows list of staff members and their active tasks
+/// Clients screen - shows list of all clients with project statistics
 /// Only accessible by admin users
-class TeamScreen extends StatefulWidget {
+class ClientsScreen extends StatefulWidget {
   final User user;
 
-  const TeamScreen({
+  const ClientsScreen({
     super.key,
     required this.user,
   });
 
   @override
-  State<TeamScreen> createState() => _TeamScreenState();
+  State<ClientsScreen> createState() => _ClientsScreenState();
 }
 
-class _TeamScreenState extends State<TeamScreen>
+class _ClientsScreenState extends State<ClientsScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   
-  List<TeamMember> teamMembers = [];
-  Map<String, dynamic> teamStats = {};
+  List<Client> clients = [];
+  Map<String, dynamic> clientStats = {};
   bool isLoading = true;
   String? errorMessage;
 
@@ -36,7 +36,7 @@ class _TeamScreenState extends State<TeamScreen>
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadTeamData();
+    _loadClientsData();
   }
 
   void _setupAnimations() {
@@ -64,20 +64,27 @@ class _TeamScreenState extends State<TeamScreen>
     _controller.forward();
   }
 
-  Future<void> _loadTeamData() async {
+  Future<void> _loadClientsData() async {
     try {
       setState(() {
         isLoading = true;
         errorMessage = null;
       });
 
-      // Load real staff data from API
-      final staffMembers = await StaffService.getStaffMembers();
-      final statistics = await StaffService.getStaffStatistics();
+      // Load real clients data from API
+      final clientsList = await ClientService.getAllClients();
+      final statistics = await ClientService.getClientStatistics();
+
+      // Sort by active projects count (descending), then by total projects (descending)
+      clientsList.sort((a, b) {
+        final activeComparison = b.activeProjectsCount.compareTo(a.activeProjectsCount);
+        if (activeComparison != 0) return activeComparison;
+        return b.totalProjectsCount.compareTo(a.totalProjectsCount);
+      });
 
       setState(() {
-        teamMembers = staffMembers;
-        teamStats = statistics;
+        clients = clientsList;
+        clientStats = statistics;
         isLoading = false;
       });
 
@@ -85,7 +92,7 @@ class _TeamScreenState extends State<TeamScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Loaded ${staffMembers.length} staff members'),
+            content: Text('✅ Loaded ${clientsList.length} clients'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
@@ -94,23 +101,22 @@ class _TeamScreenState extends State<TeamScreen>
       }
     } catch (error) {
       setState(() {
-        errorMessage = 'We apologize, but there was an issue loading the team data. Please try again later or contact support if the problem persists.\n\nError details: ${error.toString()}';
+        errorMessage = error.toString();
         isLoading = false;
-        teamMembers = [];
-        teamStats = {};
+        clients = [];
+        clientStats = {};
       });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('❌ Unable to load team data'),
-            backgroundColor: Colors.red,
+            content: Text('⚠️ Error loading clients: ${error.toString()}'),
+            backgroundColor: Colors.orange,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
+            duration: const Duration(seconds: 3),
             action: SnackBarAction(
               label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () => _loadTeamData(),
+              onPressed: _loadClientsData,
             ),
           ),
         );
@@ -154,6 +160,13 @@ class _TeamScreenState extends State<TeamScreen>
           ),
         ),
       ),
+      floatingActionButton: widget.user.isAdmin ? FloatingActionButton.extended(
+        onPressed: () => _openCreateClientScreen(),
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.person_add),
+        label: const Text('Add Client'),
+      ) : null,
     );
   }
 
@@ -184,126 +197,85 @@ class _TeamScreenState extends State<TeamScreen>
           ),
         ),
         
-        // Scrollable team list
+        // Scrollable clients list
         Expanded(
-          child: _buildScrollableTeamList(),
+          child: _buildScrollableClientsList(),
         ),
       ],
     );
   }
 
   Widget _buildCompactHeader() {
-  return Row(
-    children: [
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
-          ),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Icon(Icons.people, color: Colors.white, size: 24),
-      ),
-      const SizedBox(width: 12),
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Team Management',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.primaryColor,
-              ),
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppTheme.gradientStart, AppTheme.gradientEnd],
             ),
-            Row(
-              children: [
-                Text(
-                  'Staff overview',
-                  style: TextStyle(
-                    color: AppTheme.darkColor.withValues(alpha: 0.7),
-                    fontSize: 13,
-                  ),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.business, color: Colors.white, size: 24),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Client Management',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryColor,
                 ),
-                if (errorMessage == null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
+              ),
+              Row(
+                children: [
+                  Text(
+                    'All registered clients',
+                    style: TextStyle(
+                      color: AppTheme.darkColor.withValues(alpha: 0.7),
+                      fontSize: 13,
                     ),
-                    child: Text(
-                      'LIVE',
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                  ),
+                  if (errorMessage == null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'LIVE',
+                        style: TextStyle(
+                          color: Colors.green.shade700,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
-      ),
-      // Clients button
-      IconButton(
-        onPressed: () => _openClientsScreen(),
-        icon: const Icon(Icons.business),
-        tooltip: 'View Clients',
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.blue.withValues(alpha: 0.1),
-          foregroundColor: Colors.blue,
-          padding: const EdgeInsets.all(8),
+        // Refresh button
+        IconButton(
+          onPressed: _loadClientsData, // Fixed: Changed from _loadTeamData to _loadClientsData
+          icon: Icon(
+            isLoading ? Icons.refresh : Icons.refresh_outlined,
+            color: AppTheme.primaryColor,
+          ),
+          tooltip: 'Refresh',
+          style: IconButton.styleFrom(
+            backgroundColor: AppTheme.gradientEnd.withValues(alpha: 0.1),
+            padding: const EdgeInsets.all(8),
+          ),
         ),
-      ),
-      const SizedBox(width: 8),
-      // Refresh button
-      IconButton(
-        onPressed: _loadTeamData,
-        icon: Icon(
-          isLoading ? Icons.refresh : Icons.refresh_outlined,
-          color: AppTheme.primaryColor,
-        ),
-        tooltip: 'Refresh',
-        style: IconButton.styleFrom(
-          backgroundColor: AppTheme.gradientEnd.withValues(alpha: 0.1),
-          padding: const EdgeInsets.all(8),
-        ),
-      ),
-    ],
-  );
-}
-  void _openClientsScreen() {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => ClientsScreen(user: widget.user),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = 0.0;
-          const end = 1.0;
-          const curve = Curves.elasticOut;
-
-          var scaleAnimation = Tween(begin: begin, end: end).animate(
-            CurvedAnimation(parent: animation, curve: curve),
-          );
-
-          var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-          );
-
-          return ScaleTransition(
-            scale: scaleAnimation,
-            child: FadeTransition(
-              opacity: fadeAnimation,
-              child: child,
-            ),
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 800),
-      ),
+      ],
     );
   }
 
@@ -328,7 +300,7 @@ class _TeamScreenState extends State<TeamScreen>
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Using demo data - API connection issue',
+                'Failed to load client data. Please check your connection and try again.',
                 style: TextStyle(
                   color: Colors.orange.shade700,
                   fontSize: 11,
@@ -341,13 +313,13 @@ class _TeamScreenState extends State<TeamScreen>
     }
 
     // Stats in horizontal layout
-    final totalStaff = teamStats['total_staff'] ?? teamMembers.length;
-    final totalActiveTasks = teamStats['total_active_tasks'] ?? 
-        teamMembers.fold<int>(0, (sum, member) => sum + member.activeTasks);
-    final availableMembers = teamStats['available_members'] ?? 
-        teamMembers.where((m) => m.activeTasks == 0).length;
-    final busyMembers = teamStats['busy_members'] ?? 
-        teamMembers.where((m) => m.activeTasks > 5).length;
+    final totalClients = clientStats['total_clients'] ?? clients.length;
+    final activeClients = clientStats['active_clients'] ?? 
+        clients.where((c) => c.isActive).length;
+    final clientsWithProjects = clientStats['clients_with_projects'] ?? 
+        clients.where((c) => c.activeProjectsCount > 0).length;
+    final totalProjects = clientStats['total_active_projects'] ?? 
+        clients.fold<int>(0, (sum, c) => sum + c.activeProjectsCount);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -369,13 +341,13 @@ class _TeamScreenState extends State<TeamScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Team Overview',
+                'Clients Overview',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppTheme.primaryColor,
                 ),
               ),
-              if (teamStats.containsKey('average_workload'))
+              if (clientStats.containsKey('average_projects_per_client'))
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -383,10 +355,10 @@ class _TeamScreenState extends State<TeamScreen>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    'Avg: ${teamStats['average_workload']}',
+                    'Avg: ${clientStats['average_projects_per_client']} projects/client',
                     style: TextStyle(
                       color: AppTheme.gradientEnd,
-                      fontSize: 11,
+                      fontSize: 10,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -400,36 +372,36 @@ class _TeamScreenState extends State<TeamScreen>
             children: [
               Expanded(
                 child: _buildCompactStatCard(
-                  'Staff',
-                  totalStaff.toString(),
-                  Icons.people_outline,
+                  'Clients',
+                  totalClients.toString(),
+                  Icons.people_outlined,
                   AppTheme.primaryColor,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildCompactStatCard(
-                  'Tasks',
-                  totalActiveTasks.toString(),
-                  Icons.task_alt,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildCompactStatCard(
-                  'Free',
-                  availableMembers.toString(),
-                  Icons.check_circle_outline,
+                  'Active',
+                  activeClients.toString(),
+                  Icons.person_add_alt, // Fixed: Changed from Icons.person_check
                   Colors.green,
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildCompactStatCard(
-                  'Busy',
-                  busyMembers.toString(),
-                  Icons.schedule,
+                  'Projects',
+                  clientsWithProjects.toString(),
+                  Icons.business_center_outlined,
+                  Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildCompactStatCard(
+                  'Total',
+                  totalProjects.toString(),
+                  Icons.folder_outlined,
                   Colors.orange,
                 ),
               ),
@@ -500,7 +472,7 @@ class _TeamScreenState extends State<TeamScreen>
           ),
           const SizedBox(width: 12),
           Text(
-            'Loading statistics...',
+            'Loading client statistics...',
             style: TextStyle(
               color: AppTheme.darkColor.withValues(alpha: 0.7),
               fontSize: 14,
@@ -511,7 +483,7 @@ class _TeamScreenState extends State<TeamScreen>
     );
   }
 
-  Widget _buildScrollableTeamList() {
+  Widget _buildScrollableClientsList() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: AppConstants.defaultPadding),
       decoration: BoxDecoration(
@@ -544,7 +516,7 @@ class _TeamScreenState extends State<TeamScreen>
             child: Row(
               children: [
                 Text(
-                  'Team Members',
+                  'All Clients',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: AppTheme.primaryColor,
@@ -552,11 +524,17 @@ class _TeamScreenState extends State<TeamScreen>
                 ),
                 const Spacer(),
                 Text(
-                  '${teamMembers.length} members',
+                  '${clients.length} clients',
                   style: TextStyle(
                     color: AppTheme.darkColor.withValues(alpha: 0.6),
                     fontSize: 12,
                   ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.sort,
+                  size: 16,
+                  color: AppTheme.darkColor.withValues(alpha: 0.5),
                 ),
               ],
             ),
@@ -564,15 +542,61 @@ class _TeamScreenState extends State<TeamScreen>
           
           // Scrollable list
           Expanded(
-            child: isLoading ? _buildTeamListLoading() : _buildTeamMembersList(),
+            child: isLoading ? _buildClientsListLoading() : _buildClientsList(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTeamMembersList() {
-    if (teamMembers.isEmpty) {
+  Widget _buildClientsList() {
+    if (clients.isEmpty && errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Colors.red.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Failed to Load Clients',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.red.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Text(
+                'We apologize, but there was an issue loading the client data. Please check your internet connection and try again.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _loadClientsData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (clients.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -584,7 +608,7 @@ class _TeamScreenState extends State<TeamScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              (errorMessage?.isNotEmpty == true) ? 'Unable to load team data' : 'No team members found',
+              'No Clients Found',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade600,
@@ -593,26 +617,12 @@ class _TeamScreenState extends State<TeamScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              (errorMessage?.isNotEmpty == true) 
-                ? 'Please check your connection and try again'
-                : 'Team members will appear here when added',
+              'Clients will appear here when created',
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.grey.shade500,
               ),
             ),
-            if (errorMessage?.isNotEmpty == true) ...[
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => _loadTeamData(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ],
           ],
         ),
       );
@@ -620,37 +630,37 @@ class _TeamScreenState extends State<TeamScreen>
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: teamMembers.length,
+      itemCount: clients.length,
       separatorBuilder: (context, index) => Divider(
         height: 1,
         color: Colors.grey.withValues(alpha: 0.2),
         indent: 72,
       ),
       itemBuilder: (context, index) {
-        return _buildOptimizedTeamMemberTile(teamMembers[index]);
+        return _buildClientTile(clients[index]);
       },
     );
   }
 
-  Widget _buildOptimizedTeamMemberTile(TeamMember member) {
-    Color workloadColor = _getWorkloadColor(member.activeTasks);
+  Widget _buildClientTile(Client client) {
+    Color statusColor = _getActivityColor(client.activeProjectsCount);
     
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       leading: CircleAvatar(
         radius: 20,
-        backgroundColor: workloadColor.withValues(alpha: 0.15),
+        backgroundColor: statusColor.withValues(alpha: 0.15),
         child: Text(
-          member.initials,
+          client.initials,
           style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: workloadColor,
+            color: statusColor,
             fontSize: 14,
           ),
         ),
       ),
       title: Text(
-        member.displayName,
+        client.displayName,
         style: const TextStyle(
           fontWeight: FontWeight.w600,
           fontSize: 15,
@@ -658,38 +668,55 @@ class _TeamScreenState extends State<TeamScreen>
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: Text(
-        member.role,
-        style: TextStyle(
-          color: AppTheme.darkColor.withValues(alpha: 0.7),
-          fontSize: 12,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 4),
+          Text(
+            client.email,
+            style: TextStyle(
+              color: AppTheme.darkColor.withValues(alpha: 0.6),
+              fontSize: 12,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            client.activityStatus,
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: workloadColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: workloadColor.withValues(alpha: 0.3),
-                width: 1,
+          if (client.activeProjectsCount > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: statusColor.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                '${client.activeProjectsCount}',
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
             ),
-            child: Text(
-              '${member.activeTasks}',
-              style: TextStyle(
-                color: workloadColor,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
+            const SizedBox(width: 4),
+          ],
           Icon(
             Icons.chevron_right,
             color: AppTheme.darkColor.withValues(alpha: 0.4),
@@ -697,11 +724,11 @@ class _TeamScreenState extends State<TeamScreen>
           ),
         ],
       ),
-      onTap: () => _showMemberDetails(member),
+      onTap: () => _showClientDetails(client),
     );
   }
 
-  Widget _buildTeamListLoading() {
+  Widget _buildClientsListLoading() {
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       itemCount: 5,
@@ -729,6 +756,15 @@ class _TeamScreenState extends State<TeamScreen>
                   const SizedBox(height: 4),
                   Container(
                     height: 12,
+                    width: 100,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 10,
                     width: 80,
                     decoration: BoxDecoration(
                       color: Colors.grey.shade200,
@@ -752,14 +788,14 @@ class _TeamScreenState extends State<TeamScreen>
     );
   }
 
-  Color _getWorkloadColor(int tasks) {
-    if (tasks == 0) return Colors.green;
-    if (tasks <= 3) return Colors.blue;
-    if (tasks <= 6) return Colors.orange;
-    return Colors.red;
+  Color _getActivityColor(int projectCount) {
+    if (projectCount == 0) return Colors.grey;
+    if (projectCount <= 2) return Colors.blue;
+    if (projectCount <= 5) return Colors.green;
+    return Colors.orange;
   }
 
-  void _showMemberDetails(TeamMember member) {
+  void _showClientDetails(Client client) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -787,12 +823,12 @@ class _TeamScreenState extends State<TeamScreen>
               children: [
                 CircleAvatar(
                   radius: 24,
-                  backgroundColor: _getWorkloadColor(member.activeTasks).withValues(alpha: 0.2),
+                  backgroundColor: _getActivityColor(client.activeProjectsCount).withValues(alpha: 0.2),
                   child: Text(
-                    member.initials,
+                    client.initials,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: _getWorkloadColor(member.activeTasks),
+                      color: _getActivityColor(client.activeProjectsCount),
                       fontSize: 18,
                     ),
                   ),
@@ -803,14 +839,14 @@ class _TeamScreenState extends State<TeamScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        member.displayName,
+                        client.displayName,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.primaryColor,
                         ),
                       ),
                       Text(
-                        member.role,
+                        client.email,
                         style: TextStyle(
                           color: AppTheme.darkColor.withValues(alpha: 0.7),
                           fontSize: 14,
@@ -829,12 +865,14 @@ class _TeamScreenState extends State<TeamScreen>
             
             const SizedBox(height: 24),
             
-            // Details
-            _buildDetailRow('Email', member.email),
-            _buildDetailRow('Active Tasks', '${member.activeTasks}'),
-            if (member.totalTasks > 0)
-              _buildDetailRow('Total Assigned', '${member.totalTasks}'),
-            _buildDetailRow('Status', member.workloadStatus),
+            // Client details
+            _buildDetailRow('Email', client.email),
+            _buildDetailRow('Full Name', client.fullName.isNotEmpty ? client.fullName : 'Not provided'),
+            _buildDetailRow('Username', client.username.isNotEmpty ? client.username : 'Not set'),
+            _buildDetailRow('Status', client.isActive ? 'Active' : 'Inactive'),
+            _buildDetailRow('Active Projects', '${client.activeProjectsCount}'),
+            _buildDetailRow('Total Projects', '${client.totalProjectsCount}'),
+            _buildDetailRow('Joined', '${client.createdAt.day}/${client.createdAt.month}/${client.createdAt.year}'),
             
             const SizedBox(height: 20),
             
@@ -897,6 +935,41 @@ class _TeamScreenState extends State<TeamScreen>
         ],
       ),
     );
+  }
+
+  void _openCreateClientScreen() async {
+    final result = await Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => CreateClientScreen(user: widget.user),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = 0.0;
+          const end = 1.0;
+          const curve = Curves.elasticOut;
+
+          var scaleAnimation = Tween(begin: begin, end: end).animate(
+            CurvedAnimation(parent: animation, curve: curve),
+          );
+
+          var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+            CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+          );
+
+          return ScaleTransition(
+            scale: scaleAnimation,
+            child: FadeTransition(
+              opacity: fadeAnimation,
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 800),
+      ),
+    );
+
+    // Refresh the list if a client was created
+    if (result == true) {
+      _loadClientsData();
+    }
   }
 
   void _goBack() {
