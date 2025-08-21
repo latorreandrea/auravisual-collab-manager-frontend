@@ -28,7 +28,6 @@ class _ClientsScreenState extends State<ClientsScreen>
   late Animation<double> _fadeAnimation;
   
   List<Client> clients = [];
-  Map<String, dynamic> clientStats = {};
   bool isLoading = true;
   String? errorMessage;
 
@@ -65,64 +64,63 @@ class _ClientsScreenState extends State<ClientsScreen>
   }
 
   Future<void> _loadClientsData() async {
-    try {
-      setState(() {
-        isLoading = true;
-        errorMessage = null;
-      });
+  try {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
 
-      // Load real clients data from API
-      final clientsList = await ClientService.getAllClients();
-      final statistics = await ClientService.getClientStatistics();
+    // Load real clients data from API (no need for statistics anymore)
+    final clientsList = await ClientService.getAllClients();
 
-      // Sort by active projects count (descending), then by total projects (descending)
-      clientsList.sort((a, b) {
-        final activeComparison = b.activeProjectsCount.compareTo(a.activeProjectsCount);
-        if (activeComparison != 0) return activeComparison;
-        return b.totalProjectsCount.compareTo(a.totalProjectsCount);
-      });
+    // Sort by active projects count (descending), then by total projects (descending)
+    clientsList.sort((a, b) {
+      final activeComparison = b.activeProjectsCount.compareTo(a.activeProjectsCount);
+      if (activeComparison != 0) return activeComparison;
+      return b.totalProjectsCount.compareTo(a.totalProjectsCount);
+    });
 
-      setState(() {
-        clients = clientsList;
-        clientStats = statistics;
-        isLoading = false;
-      });
+    setState(() {
+      clients = clientsList;
+      // Remove clientStats assignment
+      isLoading = false;
+    });
 
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Loaded ${clientsList.length} clients'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
+    // Show success message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Loaded ${clientsList.length} clients'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  } catch (error) {
+    setState(() {
+      errorMessage = error.toString();
+      isLoading = false;
+      clients = [];
+      // Remove clientStats assignment
+    });
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Error loading clients: ${error.toString()}'),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: _loadClientsData,
           ),
-        );
-      }
-    } catch (error) {
-      setState(() {
-        errorMessage = error.toString();
-        isLoading = false;
-        clients = [];
-        clientStats = {};
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Error loading clients: ${error.toString()}'),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: _loadClientsData,
-            ),
-          ),
-        );
-      }
+        ),
+      );
     }
   }
+}
 
   @override
   void dispose() {
@@ -131,44 +129,44 @@ class _ClientsScreenState extends State<ClientsScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppTheme.lightColor,
-              AppTheme.whiteColor,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _scaleAnimation.value,
-                child: Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: _buildContent(),
-                ),
-              );
-            },
-          ),
+Widget build(BuildContext context) {
+  return Scaffold(
+    body: Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppTheme.lightColor,
+            AppTheme.whiteColor,
+          ],
         ),
       ),
-      floatingActionButton: widget.user.isAdmin ? FloatingActionButton.extended(
-        onPressed: () => _openCreateClientScreen(),
-        backgroundColor: AppTheme.primaryColor,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.person_add),
-        label: const Text('Add Client'),
-      ) : null,
-    );
-  }
+      child: SafeArea(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Transform.scale(
+              scale: _scaleAnimation.value,
+              child: Opacity(
+                opacity: _fadeAnimation.value,
+                child: _buildContent(),
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+    floatingActionButton: widget.user.isAdmin ? FloatingActionButton.extended(
+      onPressed: () => _openCreateClientScreen(),
+      backgroundColor: AppTheme.primaryColor,
+      foregroundColor: Colors.white,
+      icon: const Icon(Icons.person_add), // Changed to more intuitive icon
+      label: const Text('Add Client'),
+    ) : null,
+  );
+}
 
   Widget _buildContent() {
     return Column(
@@ -191,8 +189,6 @@ class _ClientsScreenState extends State<ClientsScreen>
               
               const SizedBox(height: 16),
               
-              // Horizontal stats overview
-              _buildHorizontalStats(),
             ],
           ),
         ),
@@ -204,6 +200,9 @@ class _ClientsScreenState extends State<ClientsScreen>
       ],
     );
   }
+
+// Update the FloatingActionButton icon
+
 
   Widget _buildCompactHeader() {
     return Row(
@@ -279,209 +278,6 @@ class _ClientsScreenState extends State<ClientsScreen>
     );
   }
 
-  Widget _buildHorizontalStats() {
-    if (isLoading) {
-      return _buildHorizontalStatsLoading();
-    }
-
-    // Error banner
-    if (errorMessage != null) {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.orange.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.warning_amber, color: Colors.orange, size: 18),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Failed to load client data. Please check your connection and try again.',
-                style: TextStyle(
-                  color: Colors.orange.shade700,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Stats in horizontal layout
-    final totalClients = clientStats['total_clients'] ?? clients.length;
-    final activeClients = clientStats['active_clients'] ?? 
-        clients.where((c) => c.isActive).length;
-    final clientsWithProjects = clientStats['clients_with_projects'] ?? 
-        clients.where((c) => c.activeProjectsCount > 0).length;
-    final totalProjects = clientStats['total_active_projects'] ?? 
-        clients.fold<int>(0, (sum, c) => sum + c.activeProjectsCount);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Clients Overview',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryColor,
-                ),
-              ),
-              if (clientStats.containsKey('average_projects_per_client'))
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppTheme.gradientEnd.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Avg: ${clientStats['average_projects_per_client']} projects/client',
-                    style: TextStyle(
-                      color: AppTheme.gradientEnd,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // Horizontal stats row
-          Row(
-            children: [
-              Expanded(
-                child: _buildCompactStatCard(
-                  'Clients',
-                  totalClients.toString(),
-                  Icons.people_outlined,
-                  AppTheme.primaryColor,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildCompactStatCard(
-                  'Active',
-                  activeClients.toString(),
-                  Icons.person_add_alt, // Fixed: Changed from Icons.person_check
-                  Colors.green,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildCompactStatCard(
-                  'Projects',
-                  clientsWithProjects.toString(),
-                  Icons.business_center_outlined,
-                  Colors.blue,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildCompactStatCard(
-                  'Total',
-                  totalProjects.toString(),
-                  Icons.folder_outlined,
-                  Colors.orange,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompactStatCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 10,
-              color: AppTheme.darkColor.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHorizontalStatsLoading() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            'Loading client statistics...',
-            style: TextStyle(
-              color: AppTheme.darkColor.withValues(alpha: 0.7),
-              fontSize: 14,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildScrollableClientsList() {
     return Container(

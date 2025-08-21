@@ -12,7 +12,9 @@ Backend repository: https://github.com/latorreandrea/auravisual-collab-manager-b
 - 🏠 Welcome dashboard with navigation
 - 🧑‍🤝‍🧑 Team screen (admin) with workload metrics
 - 📁 Projects screen with ticket/task indicators
-- ➕ Admin project creation (new)
+- ➕ Admin project creation
+- 👥 **Client management (admin)** - **NEW**
+- ➕ **Admin client creation** - **NEW**
 - 🎨 Theming & animated transitions
 - 🔒 Secure token storage using flutter_secure_storage
 - ❗ Friendly error handling (no mock fallbacks)
