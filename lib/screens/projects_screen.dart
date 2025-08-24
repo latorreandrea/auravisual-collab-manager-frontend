@@ -28,9 +28,14 @@ class _ProjectsScreenState extends State<ProjectsScreen>
   late Animation<double> _fadeAnimation;
   
   List<Project> projects = [];
+  List<Project> filteredProjects = [];
   Map<String, dynamic> projectStats = {};
   bool isLoading = true;
   String? errorMessage;
+  
+  // Filter and sort options
+  String _sortOption = 'default'; // 'default', 'alphabetical'
+  String _filterOption = 'all'; // 'all', 'with_tickets', 'with_tasks'
 
   @override
   void initState() {
@@ -77,9 +82,13 @@ class _ProjectsScreenState extends State<ProjectsScreen>
 
       setState(() {
         projects = projectsList;
+        filteredProjects = projectsList;
         projectStats = statistics;
         isLoading = false;
       });
+
+      // Apply current filters
+      _applyFiltersAndSort();
 
       // Show success message
       if (mounted) {
@@ -116,6 +125,56 @@ class _ProjectsScreenState extends State<ProjectsScreen>
         );
       }
     }
+  }
+
+  // Apply filters and sorting to projects list
+  void _applyFiltersAndSort() {
+    List<Project> filtered = List.from(projects);
+    
+    // Apply filters
+    switch (_filterOption) {
+      case 'with_tickets':
+        filtered = filtered.where((project) => project.openTicketsCount > 0).toList();
+        break;
+      case 'with_tasks':
+        filtered = filtered.where((project) => project.openTasksCount > 0).toList();
+        break;
+      case 'all':
+      default:
+        // No filter, show all projects
+        break;
+    }
+    
+    // Apply sorting
+    switch (_sortOption) {
+      case 'alphabetical':
+        filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        break;
+      case 'default':
+      default:
+        // Keep original order (usually by creation date)
+        break;
+    }
+    
+    setState(() {
+      filteredProjects = filtered;
+    });
+  }
+
+  // Handle sort option change
+  void _onSortChanged(String sortOption) {
+    setState(() {
+      _sortOption = sortOption;
+    });
+    _applyFiltersAndSort();
+  }
+
+  // Handle filter option change
+  void _onFilterChanged(String filterOption) {
+    setState(() {
+      _filterOption = filterOption;
+    });
+    _applyFiltersAndSort();
   }
 
   @override
@@ -194,6 +253,11 @@ class _ProjectsScreenState extends State<ProjectsScreen>
               
               // Compact header
               _buildCompactHeader(),
+              
+              const SizedBox(height: 16),
+              
+              // Filter and sort options
+              _buildFilterAndSortSection(),
               
               const SizedBox(height: 16),
               
@@ -283,6 +347,165 @@ class _ProjectsScreenState extends State<ProjectsScreen>
         ),
       ],
     );
+  }
+
+  Widget _buildFilterAndSortSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Sort and filter header
+        Row(
+          children: [
+            Icon(Icons.filter_list, color: AppTheme.primaryColor, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Filter & Sort',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppTheme.primaryColor,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '${filteredProjects.length} of ${projects.length} projects',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppTheme.darkColor.withValues(alpha: 0.6),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Filter chips row
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              // Sort options
+              _buildFilterChip(
+                label: 'Default Order',
+                isSelected: _sortOption == 'default',
+                onTap: () => _onSortChanged('default'),
+                icon: Icons.sort,
+              ),
+              const SizedBox(width: 8),
+              _buildFilterChip(
+                label: 'A-Z',
+                isSelected: _sortOption == 'alphabetical',
+                onTap: () => _onSortChanged('alphabetical'),
+                icon: Icons.sort_by_alpha,
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Divider
+              Container(
+                width: 1,
+                height: 24,
+                color: Colors.grey.withValues(alpha: 0.3),
+              ),
+              
+              const SizedBox(width: 16),
+              
+              // Filter options
+              _buildFilterChip(
+                label: 'All Projects',
+                isSelected: _filterOption == 'all',
+                onTap: () => _onFilterChanged('all'),
+                icon: Icons.folder_outlined,
+              ),
+              const SizedBox(width: 8),
+              _buildFilterChip(
+                label: 'With Tickets',
+                isSelected: _filterOption == 'with_tickets',
+                onTap: () => _onFilterChanged('with_tickets'),
+                icon: Icons.confirmation_number_outlined,
+                badgeCount: _getProjectsWithTicketsCount(),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterChip(
+                label: 'With Tasks',
+                isSelected: _filterOption == 'with_tasks',
+                onTap: () => _onFilterChanged('with_tasks'),
+                icon: Icons.task_outlined,
+                badgeCount: _getProjectsWithTasksCount(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required IconData icon,
+    int? badgeCount,
+  }) {
+    final color = isSelected ? AppTheme.gradientEnd : AppTheme.darkColor.withValues(alpha: 0.6);
+    
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.gradientEnd.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppTheme.gradientEnd : Colors.grey.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: color,
+              ),
+            ),
+            if (badgeCount != null && badgeCount > 0) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppTheme.gradientEnd : Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper methods for badge counts
+  int _getProjectsWithTicketsCount() {
+    return projects.where((project) => project.openTicketsCount > 0).length;
+  }
+
+  int _getProjectsWithTasksCount() {
+    return projects.where((project) => project.openTasksCount > 0).length;
   }
 
   Widget _buildHorizontalStats() {
@@ -556,6 +779,54 @@ class _ProjectsScreenState extends State<ProjectsScreen>
   }
 
   Widget _buildProjectsList() {
+    if (filteredProjects.isEmpty && projects.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.filter_list_off,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No Projects Match Filters',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Try adjusting your filter options',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _sortOption = 'default';
+                  _filterOption = 'all';
+                });
+                _applyFiltersAndSort();
+              },
+              icon: const Icon(Icons.clear_all),
+              label: const Text('Clear Filters'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (projects.isEmpty) {
       return Center(
         child: Column(
@@ -604,7 +875,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
 
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: projects.length,
+      itemCount: filteredProjects.length,
       separatorBuilder: (context, index) => Divider(
         height: 1,
         color: Colors.grey.withValues(alpha: 0.2),
@@ -612,7 +883,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
         endIndent: 20,
       ),
       itemBuilder: (context, index) {
-        return _buildProjectTile(projects[index]);
+        return _buildProjectTile(filteredProjects[index]);
       },
     );
   }

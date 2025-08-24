@@ -3,6 +3,7 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
 import '../screens/login_screen.dart';
+import '../screens/admin_tickets_screen.dart';
 
 /// Reusable navigation bar widget for the app
 /// Contains logo, navigation icons, and user actions
@@ -38,49 +39,12 @@ class AppNavBar extends StatelessWidget {
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Logo/Brand section
-          _buildBrandSection(),
-          
-          // Navigation icons
+          // Navigation icons (centered)
           _buildNavigationSection(context),
         ],
       ),
-    );
-  }
-
-  Widget _buildBrandSection() {
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppTheme.gradientStart,
-                AppTheme.gradientEnd,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.visibility,
-            color: Colors.white,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          'AuraVisual',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.primaryColor,
-          ),
-        ),
-      ],
     );
   }
 
@@ -98,6 +62,19 @@ class AppNavBar extends StatelessWidget {
         ),
         
         const SizedBox(width: 8),
+        
+        // Tickets icon - only for admin
+        if (user.isAdmin) ...[
+          _buildNavButton(
+            context: context,
+            icon: Icons.confirmation_number_outlined,
+            tooltip: 'Ticket Management',
+            color: AppTheme.primaryColor,
+            backgroundColor: AppTheme.gradientEnd.withValues(alpha: 0.1),
+            onPressed: () => _openTicketsScreen(context),
+          ),
+          const SizedBox(width: 8),
+        ],
         
         // User profile icon
         _buildNavButton(
@@ -317,7 +294,7 @@ class AppNavBar extends StatelessWidget {
       child: ElevatedButton(
         onPressed: () {
           Navigator.pop(context);
-          _showComingSoon(context, 'Profile editing feature coming soon! ✏️');
+          _showFeatureComingSoon(context, customMessage: 'Profile editing feature coming soon! ✏️');
         },
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.gradientEnd,
@@ -337,7 +314,31 @@ class AppNavBar extends StatelessWidget {
     );
   }
 
-  void _showComingSoon(BuildContext context, [String? customMessage]) {
+  void _openTicketsScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const AdminTicketsScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(1.0, 0.0);
+          const end = Offset.zero;
+          const curve = Curves.ease;
+
+          var tween = Tween(begin: begin, end: end).chain(
+            CurveTween(curve: curve),
+          );
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  void _showFeatureComingSoon(BuildContext context, {String? customMessage}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(customMessage ?? 'Feature coming soon! 🚀'),
