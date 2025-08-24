@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/user.dart';
-import '../models/project.dart';
 import '../services/project_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
@@ -30,8 +29,8 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
   final _descriptionController = TextEditingController();
   final _websiteUrlController = TextEditingController();
 
-  List<ProjectClient> _availableClients = [];
-  ProjectClient? _selectedClient;
+  List<Map<String, dynamic>> _availableClients = [];
+  Map<String, dynamic>? _selectedClient;
   String _selectedPlan = 'Starter Launch';
   String _selectedStatus = 'in_development';
   DateTime? _contractDate;
@@ -162,54 +161,53 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
   }
 
   Future<void> _createProject() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isCreating = true);
+  setState(() => _isCreating = true);
 
-    try {
-      final newProject = Project(
-        id: '',
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        clientId: _selectedClient?.id,
-        websiteUrl: _websiteUrlController.text.trim().isNotEmpty
-            ? _websiteUrlController.text.trim()
-            : null,
-        socialLinks: _socialLinks,
-        plan: _selectedPlan, // Not currently consumed by create endpoint but retained
-        contractSubscriptionDate: _contractDate, // Not sent (backend ignores)
-        status: _selectedStatus, // Not sent (backend sets default 'active')
-        createdAt: DateTime.now(),
+  try {
+      final request = CreateProjectRequest(
+      name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      clientId: _selectedClient?['id'], 
+      websiteUrl: _websiteUrlController.text.trim().isNotEmpty
+          ? _websiteUrlController.text.trim()
+          : null,
+      socialLinks: _socialLinks.isNotEmpty ? _socialLinks : null,
+      plan: _selectedPlan,
+      contractSubscriptionDate: _contractDate?.toIso8601String(),
+      status: _selectedStatus,
+    );
+
+    
+    final createdProject = await ProjectService.createProject(request);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ Project "${createdProject.name}" created successfully'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
       );
-
-      final createdProject = await ProjectService.createProject(newProject);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Project "${createdProject.name}" created successfully'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        Navigator.pop(context, true); // Return true to indicate success
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to create project: $error'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCreating = false);
-      }
+      Navigator.pop(context, true);
+    }
+  } catch (error) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error creating project: ${error.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() => _isCreating = false);
     }
   }
+}
 
   @override
   void dispose() {
@@ -451,7 +449,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
                   ),
                 )
               : DropdownButtonHideUnderline(
-                  child: DropdownButton<ProjectClient?>(
+                  child: DropdownButton<Map<String, dynamic>?>(
                     value: _selectedClient,
                     isExpanded: true,
                     hint: const Row(
@@ -462,7 +460,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
                       ],
                     ),
                     items: [
-                      const DropdownMenuItem<ProjectClient?>(
+                      const DropdownMenuItem<Map<String, dynamic>?>(
                         value: null,
                         child: Row(
                           children: [
@@ -472,7 +470,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
                           ],
                         ),
                       ),
-                      ..._availableClients.map((client) => DropdownMenuItem<ProjectClient?>(
+                      ..._availableClients.map((client) => DropdownMenuItem<Map<String, dynamic>?>(
                         value: client,
                         child: Row(
                           children: [
@@ -480,7 +478,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                client.displayName,
+                                _getClientDisplayName(client),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -496,6 +494,17 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
         ),
       ],
     );
+  }
+
+  // Helper method to get client display name from map
+  String _getClientDisplayName(Map<String, dynamic> client) {
+    final fullName = client['full_name'] as String?;
+    final username = client['username'] as String?;
+    final email = client['email'] as String?;
+    
+    if (fullName?.isNotEmpty == true) return fullName!;
+    if (username?.isNotEmpty == true) return username!;
+    return email ?? 'Unknown Client';
   }
 
   Widget _buildPlanDropdown() {

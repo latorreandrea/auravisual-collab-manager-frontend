@@ -820,30 +820,38 @@ class _ProjectsScreenState extends State<ProjectsScreen>
   }
 
   void _showProjectDetails(Project project) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => Container(
+      height: MediaQuery.of(context).size.height * 0.8, // Increased height
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Fixed header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
+            child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -870,7 +878,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                         ),
                       ),
                       Text(
-                        project.client?.displayName ?? 'No client',
+                        project.client?.displayName ?? 'No client assigned',
                         style: TextStyle(
                           color: AppTheme.darkColor.withValues(alpha: 0.7),
                           fontSize: 14,
@@ -886,50 +894,230 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                 ),
               ],
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Project details
-            _buildDetailRow('Description', project.description.isNotEmpty 
-                ? project.description 
-                : 'No description available'),
-            _buildDetailRow('Status', project.statusDisplayName),
-            _buildDetailRow('Plan', project.plan),
-            _buildDetailRow('Priority', project.priority),
-            _buildDetailRow('Open Tickets', '${project.openTicketsCount}'),
-            _buildDetailRow('Active Tasks', '${project.openTasksCount}'),
-            _buildDetailRow('Client Email', project.client?.email ?? '-'),
-            
-            const SizedBox(height: 20),
-            
-            // Status indicator
-            if (errorMessage == null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.api, size: 16, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Real-time data from API',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+          ),
+          
+          // Scrollable content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Project details section
+                  Text(
+                    'Project Details',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  _buildDetailRow('Description', project.description.isNotEmpty 
+                      ? project.description 
+                      : 'No description available'),
+                  _buildDetailRow('Status', project.statusDisplayName),
+                  _buildDetailRow('Plan', project.plan),
+                  _buildDetailRow('Priority', project.priority),
+                  
+                  if (project.websiteUrl?.isNotEmpty == true)
+                    _buildDetailRow('Website', project.websiteUrl!),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Client information section
+                  Text(
+                    'Client Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  _buildDetailRow('Client Name', project.client?.displayName ?? 'No client assigned'),
+                  _buildDetailRow('Client Email', project.client?.email ?? 'Not available'),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Task & Ticket statistics
+                  Text(
+                    'Project Statistics',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildProjectStatCard(
+                          'Open Tickets',
+                          '${project.openTicketsCount}',
+                          Icons.confirmation_number,
+                          Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildProjectStatCard(
+                          'Active Tasks',
+                          '${project.openTasksCount}',
+                          Icons.task_alt,
+                          Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Status overview card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(project.statusColor).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _getStatusColor(project.statusColor).withValues(alpha: 0.3),
+                        width: 1,
                       ),
                     ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.timeline,
+                          color: _getStatusColor(project.statusColor),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Project Status',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.darkColor.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          project.statusDisplayName,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(project.statusColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Social links section (if available)
+                  if (project.socialLinks.isNotEmpty == true) ...[
+                    Text(
+                      'Social Links',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: project.socialLinks.map((link) => Chip(
+                        label: Text(
+                          link.length > 30 ? '${link.substring(0, 30)}...' : link,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                        side: BorderSide(color: Colors.blue.withValues(alpha: 0.3)),
+                      )).toList(),
+                    ),
+                    const SizedBox(height: 20),
                   ],
-                ),
+                  
+                  // Status indicator (at the bottom)
+                  if (errorMessage == null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.api, size: 16, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Real-time data from API',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // Extra space at bottom for better scrolling
+                  const SizedBox(height: 20),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+// Add this helper method for project stat cards
+Widget _buildProjectStatCard(String title, String value, IconData icon, Color color) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: color.withValues(alpha: 0.3),
+        width: 1,
+      ),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.darkColor.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(

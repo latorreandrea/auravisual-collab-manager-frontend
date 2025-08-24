@@ -9,8 +9,7 @@ import 'auth_service.dart';
 class ProjectService {
   static const String _baseUrl = AppConstants.baseUrl;
 
-  /// Get all projects with client info, open tickets and active tasks (admin only)
-  /// Uses the real API endpoint: GET /admin/projects
+  /// Get all projects (admin only)
   static Future<List<Project>> getAllProjects() async {
     try {
       final token = await AuthService().getToken();
@@ -29,17 +28,7 @@ class ProjectService {
         final Map<String, dynamic> responseData = json.decode(response.body);
         final List<dynamic> projectsData = responseData['projects'] ?? [];
         
-        List<Project> projects = projectsData.map((projectJson) => 
-            Project.fromJson(projectJson)).toList();
-        
-        // Sort by number of active tickets (descending), then by active tasks (descending)
-        projects.sort((a, b) {
-          final ticketComparison = b.openTicketsCount.compareTo(a.openTicketsCount);
-          if (ticketComparison != 0) return ticketComparison;
-          return b.openTasksCount.compareTo(a.openTasksCount);
-        });
-        
-        return projects;
+        return projectsData.map((projectJson) => Project.fromJson(projectJson)).toList();
       } else if (response.statusCode == 403) {
         throw Exception('Access denied. Admin privileges required.');
       } else {
@@ -55,14 +44,14 @@ class ProjectService {
     }
   }
 
-  /// Get a specific project by ID
-  static Future<Project?> getProjectById(String projectId) async {
+  /// Get client's own projects
+  static Future<List<Project>> getClientProjects() async {
     try {
       final token = await AuthService().getToken();
       if (token == null) throw Exception('No authentication token found');
 
       final response = await http.get(
-        Uri.parse('$_baseUrl/admin/projects/$projectId'),
+        Uri.parse('$_baseUrl/client/projects'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -70,21 +59,28 @@ class ProjectService {
         },
       );
 
+      developer.log(
+        'Client projects API call: GET /client/projects',
+        name: 'ProjectService.getClientProjects',
+      );
+
       if (response.statusCode == 200) {
-        final Map<String, dynamic> projectData = json.decode(response.body);
-        return Project.fromJson(projectData);
-      } else if (response.statusCode == 404) {
-        return null;
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final List<dynamic> projectsData = responseData['projects'] ?? [];
+        
+        return projectsData.map((projectJson) => Project.fromJson(projectJson)).toList();
+      } else if (response.statusCode == 403) {
+        throw Exception('Access denied. Client authentication required.');
       } else {
-        throw Exception('Failed to load project: HTTP ${response.statusCode}');
+        throw Exception('Failed to load client projects: HTTP ${response.statusCode}');
       }
     } catch (error) {
       developer.log(
-        'Error fetching project $projectId: $error',
-        name: 'ProjectService.getProjectById',
+        'Client projects error: $error',
+        name: 'ProjectService.getClientProjects',
         error: error,
       );
-      throw Exception('Error fetching project: $error');
+      throw Exception('Error fetching client projects: $error');
     }
   }
 
@@ -94,18 +90,10 @@ class ProjectService {
       final projects = await getAllProjects();
       
       final totalProjects = projects.length;
-      final activeProjects = projects.where((p) => 
-          p.status == 'in_development').length;
-      final completedProjects = projects.where((p) => 
-          p.status == 'completed').length;
-      final totalOpenTickets = projects.fold<int>(
-        0, (sum, project) => sum + project.openTicketsCount,
-      );
-      final totalOpenTasks = projects.fold<int>(
-        0, (sum, project) => sum + project.openTasksCount,
-      );
-      final highPriorityProjects = projects.where((p) => 
-          p.priority == 'High').length;
+      final activeProjects = projects.where((p) => p.status == 'in_development' || p.status == 'active').length;
+      final completedProjects = projects.where((p) => p.status == 'completed').length;
+      final totalOpenTickets = projects.fold<int>(0, (sum, project) => sum + project.openTicketsCount);
+      final totalOpenTasks = projects.fold<int>(0, (sum, project) => sum + project.openTasksCount);
       
       return {
         'total_projects': totalProjects,
@@ -113,7 +101,6 @@ class ProjectService {
         'completed_projects': completedProjects,
         'total_open_tickets': totalOpenTickets,
         'total_open_tasks': totalOpenTasks,
-        'high_priority_projects': highPriorityProjects,
         'average_tickets_per_project': totalProjects > 0 
             ? (totalOpenTickets / totalProjects).toStringAsFixed(1) 
             : '0',
@@ -128,9 +115,48 @@ class ProjectService {
     }
   }
 
+  /// Get all clients for project creation (admin only)
+  static Future<List<Map<String, dynamic>>> getAllClients() async {
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/admin/clients'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      developer.log(
+        'Get all clients API call: GET /admin/clients',
+        name: 'ProjectService.getAllClients',
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final List<dynamic> clientsData = responseData['clients'] ?? [];
+        
+        return clientsData.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 403) {
+        throw Exception('Access denied. Admin privileges required.');
+      } else {
+        throw Exception('Failed to load clients: HTTP ${response.statusCode}');
+      }
+    } catch (error) {
+      developer.log(
+        'Get all clients error: $error',
+        name: 'ProjectService.getAllClients',
+        error: error,
+      );
+      throw Exception('Error fetching clients: $error');
+    }
+  }
+
   /// Create a new project (admin only)
-  /// Uses the real API endpoint: POST /admin/projects
-  static Future<Project> createProject(Project project) async {
+  static Future<Project> createProject(CreateProjectRequest request) async {
     try {
       final token = await AuthService().getToken();
       if (token == null) throw Exception('No authentication token found');
@@ -142,69 +168,72 @@ class ProjectService {
           'Accept': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: json.encode(project.toCreateJson()),
+        body: json.encode(request.toJson()),
       );
 
-      developer.log(
-        'Create project request: ${project.toCreateJson()}',
-        name: 'ProjectService.createProject',
-      );
-
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         final Map<String, dynamic> responseData = json.decode(response.body);
-        // Backend returns { message: ..., project: { ... }, created_by: ... }
-        final projectJson = responseData['project'] ?? responseData;
-        return Project.fromJson(projectJson);
+        
+        if (responseData.containsKey('project')) {
+          return Project.fromJson(responseData['project']);
+        } else {
+          return Project.fromJson(responseData);
+        }
       } else if (response.statusCode == 403) {
         throw Exception('Access denied. Admin privileges required.');
-      } else if (response.statusCode == 400) {
-        final errorData = json.decode(response.body);
-        throw Exception('Invalid project data: ${errorData['detail'] ?? 'Unknown error'}');
       } else {
-        throw Exception('Failed to create project: HTTP ${response.statusCode}');
+        final errorData = json.decode(response.body);
+        final errorMessage = errorData['message'] ?? 'Unknown error occurred';
+        throw Exception('Failed to create project: $errorMessage');
       }
     } catch (error) {
       developer.log(
-        'ProjectService Create Error: $error',
+        'Create project error: $error',
         name: 'ProjectService.createProject',
         error: error,
       );
       throw Exception('Error creating project: $error');
     }
   }
+}
 
-  /// Get all clients for project creation dropdown (admin only)
-  static Future<List<ProjectClient>> getAllClients() async {
-    try {
-      final token = await AuthService().getToken();
-      if (token == null) throw Exception('No authentication token found');
+/// Request model for creating a new project
+class CreateProjectRequest {
+  final String name;
+  final String description;
+  final String? clientId;
+  final String? websiteUrl;
+  final List<String>? socialLinks;
+  final String plan;
+  final String? contractSubscriptionDate;
+  final String status;
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/admin/users/clients'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+  const CreateProjectRequest({
+    required this.name,
+    required this.description,
+    this.clientId,
+    this.websiteUrl,
+    this.socialLinks,
+    required this.plan,
+    this.contractSubscriptionDate,
+    required this.status,
+  });
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        final List<dynamic> clientsData = responseData['clients'] ?? [];
-        
-        return clientsData.map((clientJson) => ProjectClient.fromJson(clientJson)).toList();
-      } else if (response.statusCode == 403) {
-        throw Exception('Access denied. Admin privileges required.');
-      } else {
-        throw Exception('Failed to load clients: HTTP ${response.statusCode}');
-      }
-    } catch (error) {
-      developer.log(
-        'Error fetching clients: $error',
-        name: 'ProjectService.getAllClients',
-        error: error,
-      );
-      throw Exception('Error fetching clients: $error');
-    }
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'description': description,
+      if (clientId != null && clientId!.isNotEmpty) 'client_id': clientId,
+      if (websiteUrl != null && websiteUrl!.isNotEmpty) 'website': websiteUrl,
+      if (socialLinks != null && socialLinks!.isNotEmpty) 'socials': socialLinks!.join(', '),
+      'plan': plan,
+      if (contractSubscriptionDate != null) 'contract_subscription_date': contractSubscriptionDate,
+      'status': status,
+    };
+  }
+
+  @override
+  String toString() {
+    return 'CreateProjectRequest(name: $name, plan: $plan, status: $status, clientId: $clientId)';
   }
 }

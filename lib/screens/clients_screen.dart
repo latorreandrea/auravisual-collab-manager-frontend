@@ -592,30 +592,38 @@ Widget build(BuildContext context) {
   }
 
   void _showClientDetails(Client client) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => Container(
+      height: MediaQuery.of(context).size.height * 0.75, // Increased height
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Fixed header
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
+            child: Row(
               children: [
                 CircleAvatar(
                   radius: 24,
@@ -658,48 +666,184 @@ Widget build(BuildContext context) {
                 ),
               ],
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Client details
-            _buildDetailRow('Email', client.email),
-            _buildDetailRow('Full Name', client.fullName.isNotEmpty ? client.fullName : 'Not provided'),
-            _buildDetailRow('Username', client.username.isNotEmpty ? client.username : 'Not set'),
-            _buildDetailRow('Status', client.isActive ? 'Active' : 'Inactive'),
-            _buildDetailRow('Active Projects', '${client.activeProjectsCount}'),
-            _buildDetailRow('Total Projects', '${client.totalProjectsCount}'),
-            _buildDetailRow('Joined', '${client.createdAt.day}/${client.createdAt.month}/${client.createdAt.year}'),
-            
-            const SizedBox(height: 20),
-            
-            // Status indicator
-            if (errorMessage == null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.api, size: 16, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Real-time data from API',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+          ),
+          
+          // Scrollable content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Client details section
+                  Text(
+                    'Client Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  _buildDetailRow('Email', client.email),
+                  _buildDetailRow('Full Name', client.fullName.isNotEmpty ? client.fullName : 'Not provided'),
+                  _buildDetailRow('Username', client.username.isNotEmpty ? client.username : 'Not set'),
+                  _buildDetailRow('Status', client.isActive ? 'Active' : 'Inactive'),
+                  _buildDetailRow('Joined', '${client.createdAt.day}/${client.createdAt.month}/${client.createdAt.year}'),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Project statistics section
+                  Text(
+                    'Project Statistics',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          'Active Projects',
+                          '${client.activeProjectsCount}',
+                          Icons.folder_open,
+                          Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          'Total Projects',
+                          '${client.totalProjectsCount}',
+                          Icons.folder,
+                          Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Activity status card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: _getActivityColor(client.activeProjectsCount).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _getActivityColor(client.activeProjectsCount).withValues(alpha: 0.3),
+                        width: 1,
                       ),
                     ),
-                  ],
-                ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.assessment,
+                          color: _getActivityColor(client.activeProjectsCount),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Activity Level',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: AppTheme.darkColor.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          client.activityStatus,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _getActivityColor(client.activeProjectsCount),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Status indicator (at the bottom)
+                  if (errorMessage == null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.api, size: 16, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Real-time data from API',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // Extra space at bottom for better scrolling
+                  const SizedBox(height: 20),
+                ],
               ),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+// Helper method for stat cards
+Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: color.withValues(alpha: 0.3),
+        width: 1,
+      ),
+    ),
+    child: Column(
+      children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 12,
+            color: AppTheme.darkColor.withValues(alpha: 0.7),
+            fontWeight: FontWeight.w500,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(

@@ -9,15 +9,17 @@ Backend repository: https://github.com/latorreandrea/auravisual-collab-manager-b
 ## ✨ Current Features
 - 🔐 Secure JWT authentication (admin, internal staff, client roles)
 - 👤 Role-based UI (admin-only sections hidden for others)
-- 🏠 Welcome dashboard with navigation
-- 🧑‍🤝‍🧑 Team screen (admin) with workload metrics
-- 📁 Projects screen with ticket/task indicators
-- ➕ Admin project creation
-- 👥 **Client management (admin)** - **NEW**
-- ➕ **Admin client creation** - **NEW**
-- 🎨 Theming & animated transitions
+- 🏠 **Welcome dashboard with real-time insights** - **UPDATED**
+- 🧑‍🤝‍🧑 Team screen (admin) with workload metrics & client management access
+- 📁 Projects screen with ticket/task indicators & scrollable detail modals
+- ➕ Admin project creation with backend API integration
+- 👥 **Complete client management system (admin)** - **NEW**
+- ➕ **Admin client creation with validation** - **NEW**
+- 📊 **Real-time dashboard with role-based data** - **NEW**
+- 📱 **Scrollable detail modals** - **NEW**
+- 🎨 Theming & animated transitions with zoom effects
 - 🔒 Secure token storage using flutter_secure_storage
-- ❗ Friendly error handling (no mock fallbacks)
+- ❗ Production-ready error handling (all mock data eliminated)
 
 ## 🆕 Admin Project Creation
 Admin users can now create projects via a dedicated screen accessed from a floating action button (FAB) on the Projects screen.
@@ -48,7 +50,7 @@ Indexes & trigger keep performance and updated_at integrity.
 4. List refreshes automatically on success
 
 ### Request Payload
-```
+```json
 {
   "name": "Landing Redesign",
   "description": "Marketing site revamp",
@@ -60,6 +62,87 @@ Indexes & trigger keep performance and updated_at integrity.
   "status": "in_development"
 }
 ```
+
+## 👥 Client Management System
+Complete client management capabilities for admin users with dedicated screens and real-time data.
+
+### Client Features
+- **Client List View**: Overview of all clients with project statistics
+- **Client Creation**: Admin can create new client accounts with validation
+- **Client Details**: Scrollable modal with complete client information
+- **Project Statistics**: Real-time count of projects per client
+
+### Client Schema (Database)
+```json
+{
+  "id": "UUID",
+  "first_name": "string",
+  "last_name": "string", 
+  "email": "string (unique)",
+  "role": "client",
+  "created_at": "timestamp",
+  "project_count": "number (computed)"
+}
+```
+
+### Client Creation Flow
+1. Admin navigates to Team screen
+2. Taps "View Clients" button to access ClientsScreen
+3. Taps + FAB to create new client
+4. Fills form with validation (name, email, password requirements)
+5. Submits -> POST /auth/register with role: "client"
+6. Client list refreshes automatically
+
+### API Endpoints
+- `GET /admin/users/clients` - Fetch all clients with project counts
+- `POST /auth/register` - Create new client account
+
+## 📊 Real-Time Dashboard
+Dynamic dashboard with role-based insights powered by live API data.
+
+### Dashboard Features
+- **Role-Based Content**: Different insights for Admin, Staff, and Client users
+- **Live Data Indicators**: Real-time updates with "Live" badges
+- **Loading States**: Smooth loading animations with skeleton screens
+- **Error Handling**: Graceful fallbacks with retry mechanisms
+
+### Dashboard Data by Role
+
+#### Admin Dashboard
+- Total active projects count
+- Staff workload distribution  
+- Recent project activity
+- System overview metrics
+
+#### Staff Dashboard
+- Assigned tasks count
+- Personal workload status
+- Recent task updates
+- Team collaboration metrics
+
+#### Client Dashboard  
+- Client-specific project count
+- Project status overview
+- Recent project updates
+- Access to project details
+
+### API Integration
+- `GET /admin/dashboard` - Admin overview data
+- `GET /tasks/my` - Staff personal tasks
+- `GET /client/projects` - Client project data
+
+## 🎨 UI/UX Improvements
+
+### Scrollable Detail Modals
+All detail modals (projects and clients) now feature:
+- **Vertical Scrolling**: Prevents content overflow on smaller screens
+- **Responsive Design**: Adapts to different screen sizes
+- **Smooth Animations**: Zoom transitions for better user experience
+
+### Enhanced Navigation
+- **Role-Based Access**: UI elements show/hide based on user permissions
+- **Floating Action Buttons**: Quick access to creation screens
+- **Animated Transitions**: Smooth page transitions with custom effects
 
 ## 🛠 Tech Stack
 | Layer | Technology |
@@ -73,43 +156,101 @@ Indexes & trigger keep performance and updated_at integrity.
 ## 📂 Directory Structure
 ```
 lib/
-  models/        # Data models (User, Project, TeamMember)
-  services/      # API service layer (auth, staff, projects)
-  screens/       # UI screens
+  models/        # Data models (User, Project, TeamMember, Client)
+    client.dart    # Client model with project statistics
+    project.dart   # Updated project model with backend alignment
+    user.dart      # User model with role management
+  services/      # API service layer (auth, staff, projects, clients, dashboard)
+    auth_service.dart      # JWT authentication
+    client_service.dart    # Client management operations - NEW
+    dashboard_service.dart # Real-time dashboard data - NEW  
+    project_service.dart   # Project CRUD operations
+    staff_service.dart     # Staff management
+  screens/       # UI screens with role-based access
+    welcome_screen.dart      # Updated with real-time dashboard
+    clients_screen.dart      # Client management interface - NEW
+    create_client_screen.dart # Client creation form - NEW
+    create_project_screen.dart # Updated project creation
+    team_screen.dart         # Enhanced with client access
+    projects_screen.dart     # Updated with scrollable modals
   widgets/       # Reusable UI components
-  theme/         # Theming and styles
-  utils/         # Constants, validators
+  theme/         # Material Design 3 theming and styles
+  utils/         # Constants, validators, helpers
 ```
 
 ## 🚀 Run Locally
 Make sure Flutter SDK is installed.
 
-```
+```bash
 flutter pub get
 flutter run
 ```
 
+## 🌐 API Endpoints
+The app integrates with the following backend endpoints:
+
+### Authentication
+- `POST /auth/login` - User authentication
+- `POST /auth/register` - Client registration (admin only)
+
+### Dashboard  
+- `GET /admin/dashboard` - Admin dashboard data
+- `GET /tasks/my` - Staff tasks and workload
+- `GET /client/projects` - Client project overview
+
+### Project Management
+- `GET /admin/projects` - List all projects
+- `POST /admin/projects` - Create new project (admin only)
+
+### Client Management
+- `GET /admin/users/clients` - List all clients with statistics
+- `GET /admin/users/staff` - List all staff members
+
+### Base URL
+```
+https://app.auravisual.dk
+```
+
 ## 🔐 Authentication
-The app expects a backend issuing JWT tokens. `AuthService` handles:
-- Login -> stores token
-- Logout -> clears secure storage
-- Injects Authorization: Bearer <token> on API calls
+The app uses production-ready JWT authentication with role-based access control.
+
+### AuthService Features
+- **Login Flow**: Secure token storage with flutter_secure_storage
+- **Role Management**: Admin, Staff, Client role differentiation
+- **Token Injection**: Automatic Authorization: Bearer <token> on API calls
+- **Logout**: Complete session cleanup and secure storage clearing
+
+### API Security
+All API calls include proper authentication headers and error handling:
+```dart
+headers: {
+  'Authorization': 'Bearer $token',
+  'Content-Type': 'application/json',
+}
+```
 
 ## 🧪 Testing
 A sample widget test exists in `test/`. Add more as features grow.
 
-## 🧱 Error Handling Philosophy
-- No mock data fallbacks in production paths
-- User-facing friendly messages
-- Developer logging with `dart:developer`
+## 🧱 Error Handling & Production Readiness
+- **Zero Mock Data**: All mock data fallbacks completely eliminated
+- **User-Friendly Messages**: Clear error messages with actionable feedback
+- **Developer Logging**: Comprehensive logging with `dart:developer`
+- **API Error Handling**: Proper HTTP status code handling with retry mechanisms
+- **Validation**: Form validation with real-time feedback
+- **Loading States**: Skeleton screens and loading indicators throughout the app
 
 ## 📌 Next Possible Enhancements
-- Task management UI
-- Ticket drill-down view
-- Client portal simplified view
-- Pagination & search for staff/projects
-- Dark mode
-- CI pipeline (format, analyze, test)
+- Advanced task management with drag & drop
+- Ticket drill-down view with comments
+- Client portal with simplified view
+- Real-time notifications and updates
+- Advanced search and filtering
+- Pagination for large datasets
+- Dark mode implementation
+- Offline capability with sync
+- Performance analytics dashboard
+- CI/CD pipeline (format, analyze, test, deploy)
 
 ## 🤝 Contributing
 Open to improvements. Submit an issue or PR.
