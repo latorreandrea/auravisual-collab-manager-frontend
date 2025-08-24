@@ -8,6 +8,7 @@ import 'team_screen.dart';
 import 'projects_screen.dart';
 import 'client_projects_screen.dart';
 import 'client_tasks_screen.dart';
+import 'create_ticket_screen.dart';
 
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
@@ -690,25 +691,76 @@ void _openClientTasksScreen(BuildContext context) {
   );
 }
 
-// Quick actions for client users (only Projects and Tasks)
+// Add new method for client ticket creation
+void _openCreateTicketScreen(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => CreateTicketScreen(user: widget.user),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = 0.0;
+        const end = 1.0;
+        const curve = Curves.elasticOut;
+
+        var scaleAnimation = Tween(begin: begin, end: end).animate(
+          CurvedAnimation(parent: animation, curve: curve),
+        );
+
+        var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+        );
+
+        return ScaleTransition(
+          scale: scaleAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 800),
+    ),
+  );
+}
+
+// Quick actions for client users (Projects, Tasks, and Create Ticket)
 Widget _buildClientQuickActions() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  return Column(
     children: [
-      Expanded(
-        child: _buildActionButton(
-          icon: Icons.folder_outlined,
-          label: 'Projects',
-          onTap: () => _openProjectsScreen(context),
-        ),
+      // First row: Projects and Tasks
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.folder_outlined,
+              label: 'Projects',
+              onTap: () => _openProjectsScreen(context),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.task_outlined,
+              label: 'Tasks',
+              onTap: () => _openClientTasksScreen(context),
+            ),
+          ),
+        ],
       ),
-      const SizedBox(width: 16),
-      Expanded(
-        child: _buildActionButton(
-          icon: Icons.task_outlined,
-          label: 'Tasks',
-          onTap: () => _openClientTasksScreen(context), // Updated to use client tasks screen
-        ),
+      const SizedBox(height: 16),
+      // Second row: Tickets (centered)
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 120,
+            child: _buildActionButton(
+              icon: Icons.confirmation_number_outlined,
+              label: 'Create Ticket',
+              onTap: () => _openCreateTicketScreen(context),
+            ),
+          ),
+        ],
       ),
     ],
   );

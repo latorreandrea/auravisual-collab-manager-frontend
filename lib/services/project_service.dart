@@ -84,6 +84,46 @@ class ProjectService {
     }
   }
 
+  /// Get all clients for project creation (admin only)
+  static Future<List<Map<String, dynamic>>> getAllClients() async {
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/admin/users/clients'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      developer.log(
+        'Get all clients API call: GET /admin/users/clients',
+        name: 'ProjectService.getAllClients',
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> responseData = json.decode(response.body);
+        final List<dynamic> clientsData = responseData['clients'] ?? [];
+        
+        return clientsData.cast<Map<String, dynamic>>();
+      } else if (response.statusCode == 403) {
+        throw Exception('Access denied. Admin privileges required.');
+      } else {
+        throw Exception('Failed to load clients: HTTP ${response.statusCode}');
+      }
+    } catch (error) {
+      developer.log(
+        'Get all clients error: $error',
+        name: 'ProjectService.getAllClients',
+        error: error,
+      );
+      throw Exception('Error fetching clients: $error');
+    }
+  }
+
   /// Get project statistics for dashboard
   static Future<Map<String, dynamic>> getProjectStatistics() async {
     try {
@@ -112,46 +152,6 @@ class ProjectService {
         error: error,
       );
       throw Exception('Error calculating project statistics: $error');
-    }
-  }
-
-  /// Get all clients for project creation (admin only)
-  static Future<List<Map<String, dynamic>>> getAllClients() async {
-    try {
-      final token = await AuthService().getToken();
-      if (token == null) throw Exception('No authentication token found');
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/admin/clients'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      developer.log(
-        'Get all clients API call: GET /admin/clients',
-        name: 'ProjectService.getAllClients',
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        final List<dynamic> clientsData = responseData['clients'] ?? [];
-        
-        return clientsData.cast<Map<String, dynamic>>();
-      } else if (response.statusCode == 403) {
-        throw Exception('Access denied. Admin privileges required.');
-      } else {
-        throw Exception('Failed to load clients: HTTP ${response.statusCode}');
-      }
-    } catch (error) {
-      developer.log(
-        'Get all clients error: $error',
-        name: 'ProjectService.getAllClients',
-        error: error,
-      );
-      throw Exception('Error fetching clients: $error');
     }
   }
 

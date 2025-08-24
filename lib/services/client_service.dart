@@ -103,6 +103,8 @@ class ClientService {
     }
   }
 
+  
+
   /// Get client statistics for dashboard
   static Future<Map<String, dynamic>> getClientStatistics() async {
     try {
