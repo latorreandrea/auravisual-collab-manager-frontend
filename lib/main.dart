@@ -38,9 +38,6 @@ class AuravisualApp extends StatelessWidget {
       // App-wide navigation routes (we'll add more screens later)
       routes: {
         '/login': (context) => const LoginScreen(),
-        // TODO: Add more routes here as we create new screens
-        // '/dashboard': (context) => const DashboardScreen(),
-        // '/projects': (context) => const ProjectsScreen(),
       },
     );
   }

@@ -248,7 +248,7 @@ class AppNavBar extends StatelessWidget {
             _buildProfileInfoRow('Email', user.email),
             if (user.shouldShowRole)
               _buildProfileInfoRow('Role', user.roleDisplayName),
-            _buildProfileInfoRow('Member since', 'January 2024'), // TODO: real date
+            _buildProfileInfoRow('Member since', 'January 2024'),
           ],
         ),
       ),

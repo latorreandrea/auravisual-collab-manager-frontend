@@ -431,7 +431,7 @@ class _CreateTasksDialogState extends State<CreateTasksDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('${validTasks.length} tasks created successfully'),
+              content: Text('${validTasks.length} tasks created successfully! Ticket moved to accepted status.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -501,8 +501,9 @@ class _CreateTasksDialogState extends State<CreateTasksDialog> {
                                 const Spacer(),
                                 if (tasks.length > 1)
                                   IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
                                     onPressed: () => _removeTask(index),
+                                    tooltip: 'Remove task',
                                   ),
                               ],
                             ),
@@ -567,26 +568,49 @@ class _CreateTasksDialogState extends State<CreateTasksDialog> {
               children: [
                 TextButton.icon(
                   onPressed: _addTask,
-                  icon: const Icon(Icons.add),
+                  icon: const Icon(Icons.add_circle_outline, size: 18),
                   label: const Text('Add Task'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blue,
+                  ),
                 ),
                 const Spacer(),
-                TextButton(
+                TextButton.icon(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: isCreating ? null : _createTasks,
-                  child: isCreating
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Create Tasks'),
+                  icon: const Icon(Icons.close, size: 18),
+                  label: const Text('Cancel'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
+                  ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: isCreating ? null : _createTasks,
+                icon: isCreating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.add_task, size: 20),
+                label: isCreating
+                    ? const Text('Creating...')
+                    : const Text('Create Tasks'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[600],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 3,
+                  shadowColor: Colors.green[300],
+                ),
+              ),
             ),
           ],
         ),

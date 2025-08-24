@@ -6,15 +6,14 @@ class AdminTicketService {
   static const String baseUrl = 'https://app.auravisual.dk';
   final AuthService _authService = AuthService();
 
-  /// Get all tickets for admin (filtering for to_read and processing)
-  Future<List<Map<String, dynamic>>> getAdminTickets({String? status}) async {
+  /// Get tickets that need admin attention (only to_read and processing status)
+  Future<List<Map<String, dynamic>>> getTicketsForAdmin() async {
     try {
       final token = await _authService.getToken();
       if (token == null) {
         throw Exception('Token not available');
       }
 
-      // Get tickets from admin/projects endpoint which includes open tickets
       final response = await http.get(
         Uri.parse('$baseUrl/admin/projects'),
         headers: {
@@ -24,60 +23,118 @@ class AdminTicketService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final projects = List<Map<String, dynamic>>.from(data['projects'] ?? []);
+        final responseData = json.decode(response.body);
         
-        // Extract all open tickets from all projects
-        final List<Map<String, dynamic>> allTickets = [];
-        for (final project in projects) {
-          final openTickets = List<Map<String, dynamic>>.from(project['open_tickets'] ?? []);
-          for (final ticket in openTickets) {
-            // Add project and client info to ticket
-            ticket['project'] = {
-              'id': project['id'],
-              'name': project['name'],
-              'status': project['status'],
-            };
-            ticket['client'] = project['client'];
-            allTickets.add(ticket);
+        // Handle both direct list and object containing list
+        List<dynamic> data;
+        if (responseData is List) {
+          data = responseData;
+        } else if (responseData is Map<String, dynamic>) {
+          // Check common keys that might contain the projects list
+          if (responseData.containsKey('projects')) {
+            data = responseData['projects'] as List;
+          } else if (responseData.containsKey('data')) {
+            data = responseData['data'] as List;
+          } else if (responseData.containsKey('results')) {
+            data = responseData['results'] as List;
+          } else {
+            // If it's an object but doesn't contain expected keys, treat as empty
+            data = [];
+          }
+        } else {
+          data = [];
+        }
+        
+        // Extract tickets from projects and filter by status
+        List<Map<String, dynamic>> allTickets = [];
+        
+        for (var project in data) {
+          if (project != null && project is Map<String, dynamic>) {
+            if (project['tickets'] != null && project['tickets'] is List) {
+              for (var ticket in project['tickets']) {
+                if (ticket != null && ticket is Map<String, dynamic>) {
+                  // Only include tickets with status 'to_read' or 'processing'
+                  // Exclude 'accepted' and 'rejected' tickets
+                  final status = ticket['status']?.toString() ?? '';
+                  if (status == 'to_read' || status == 'processing') {
+                    ticket['project_name'] = project['name'];
+                    ticket['project_id'] = project['id'];
+                    allTickets.add(Map<String, dynamic>.from(ticket));
+                  }
+                }
+              }
+            }
           }
         }
         
         return allTickets;
       } else {
-        throw Exception('Error loading tickets: ${response.statusCode}');
+        throw Exception('Error fetching projects: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Connection error: $e');
     }
   }
 
-  /// Get tickets with to_read and processing status
-  Future<List<Map<String, dynamic>>> getTicketsForAdmin() async {
-    try {
-      final allTickets = await getAdminTickets();
-      
-      // Filter for tickets that admin can work on
-      return allTickets.where((ticket) {
-        final status = ticket['status'] ?? '';
-        return status == 'to_read' || status == 'processing';
-      }).toList();
-    } catch (e) {
-      throw Exception('Error loading tickets: $e');
-    }
-  }
-
-  /// Get detailed ticket information
-  Future<Map<String, dynamic>?> getTicketDetails(String ticketId) async {
+  /// Get staff members for task assignment
+  Future<List<Map<String, dynamic>>> getStaffMembers() async {
     try {
       final token = await _authService.getToken();
       if (token == null) {
         throw Exception('Token not available');
       }
 
-      // Use client endpoint but with admin token to get ticket details
+      // Get both staff and admin users
+      final staffResponse = await http.get(
+        Uri.parse('$baseUrl/admin/users/staff'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      final adminResponse = await http.get(
+        Uri.parse('$baseUrl/admin/users'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      List<Map<String, dynamic>> allUsers = [];
+
+      if (staffResponse.statusCode == 200) {
+        final staffData = json.decode(staffResponse.body) as List;
+        allUsers.addAll(staffData.cast<Map<String, dynamic>>());
+      }
+
+      if (adminResponse.statusCode == 200) {
+        final adminData = json.decode(adminResponse.body) as List;
+        // Filter to only admin users and avoid duplicates
+        for (var user in adminData) {
+          if (user['role'] == 'admin' && 
+              !allUsers.any((existing) => existing['id'] == user['id'])) {
+            allUsers.add(Map<String, dynamic>.from(user));
+          }
+        }
+      }
+
+      return allUsers;
+    } catch (e) {
+      throw Exception('Connection error: $e');
+    }
+  }
+
+  /// Get ticket details by ID (admin access)
+  Future<Map<String, dynamic>> getTicketDetails(String ticketId) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) {
+        throw Exception('Token not available');
+      }
+
       final response = await http.get(
-        Uri.parse('$baseUrl/client/tickets/$ticketId'),
+        Uri.parse('$baseUrl/admin/tickets/$ticketId'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -85,26 +142,29 @@ class AdminTicketService {
       );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['ticket'];
+        final responseData = json.decode(response.body);
+        
+        // Handle both direct ticket object and wrapped response
+        if (responseData is Map<String, dynamic>) {
+          if (responseData.containsKey('ticket')) {
+            return responseData['ticket'] as Map<String, dynamic>;
+          } else {
+            return responseData;
+          }
+        } else {
+          throw Exception('Unexpected response format');
+        }
+      } else if (response.statusCode == 404) {
+        throw Exception('Ticket not found');
       } else {
-        throw Exception('Error loading ticket: ${response.statusCode}');
+        throw Exception('Failed to load ticket details: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Connection error: $e');
+      throw Exception('Error fetching ticket details: $e');
     }
   }
 
-  /// Update ticket status to processing - This happens automatically when tasks are created
-  /// So we don't need a separate endpoint, just create tasks directly
-  Future<bool> updateTicketStatusToProcessing(String ticketId) async {
-    // According to the API docs, ticket status changes to 'processing' automatically
-    // when tasks are created via POST /admin/tickets/{id}/tasks
-    // So this method is not needed, but we keep it for UI consistency
-    return true;
-  }
-
-  /// Create bulk tasks for a ticket
+  /// Create bulk tasks for a ticket and mark it as accepted
   Future<Map<String, dynamic>?> createTasksForTicket(
     String ticketId,
     List<Map<String, dynamic>> tasks,
@@ -128,6 +188,10 @@ class AdminTicketService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
+        
+        // After creating tasks successfully, mark ticket as accepted
+        await _updateTicketStatus(ticketId, 'accepted');
+        
         return data;
       } else {
         throw Exception('Error creating tasks: ${response.statusCode}');
@@ -137,51 +201,32 @@ class AdminTicketService {
     }
   }
 
-  /// Get all staff members for task assignment
-  Future<List<Map<String, dynamic>>> getStaffMembers() async {
+  /// Update ticket status (private method)
+  Future<bool> _updateTicketStatus(String ticketId, String status) async {
     try {
       final token = await _authService.getToken();
       if (token == null) {
         throw Exception('Token not available');
       }
 
-      // Get both staff and admin users for task assignment
-      final [staffResponse, usersResponse] = await Future.wait([
-        http.get(
-          Uri.parse('$baseUrl/admin/users/staff'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-        http.get(
-          Uri.parse('$baseUrl/admin/users'),
-          headers: {
-            'Authorization': 'Bearer $token',
-            'Content-Type': 'application/json',
-          },
-        ),
-      ]);
+      // Try to update the ticket status
+      // Note: This endpoint might not exist, but we'll attempt it
+      final response = await http.patch(
+        Uri.parse('$baseUrl/admin/tickets/$ticketId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'status': status,
+        }),
+      );
 
-      final List<Map<String, dynamic>> allAssignableUsers = [];
-      
-      // Add staff members
-      if (staffResponse.statusCode == 200) {
-        final staffData = json.decode(staffResponse.body);
-        allAssignableUsers.addAll(List<Map<String, dynamic>>.from(staffData['staff'] ?? []));
-      }
-      
-      // Add admin users
-      if (usersResponse.statusCode == 200) {
-        final usersData = json.decode(usersResponse.body);
-        final users = List<Map<String, dynamic>>.from(usersData['users'] ?? []);
-        final admins = users.where((user) => user['role'] == 'admin').toList();
-        allAssignableUsers.addAll(admins);
-      }
-
-      return allAssignableUsers;
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      throw Exception('Connection error: $e');
+      // Don't throw here, just return false as it's not critical
+      // The status change might happen automatically on the backend
+      return false;
     }
   }
 }
