@@ -26,32 +26,40 @@ class AdminTicketService {
         final responseData = json.decode(response.body);
         
         // Handle both direct list and object containing list
-        List<dynamic> data;
+        List<dynamic> projectsList;
         if (responseData is List) {
-          data = responseData;
+          projectsList = responseData;
         } else if (responseData is Map<String, dynamic>) {
-          // Check common keys that might contain the projects list
+          // Check for 'projects' key in the response
           if (responseData.containsKey('projects')) {
-            data = responseData['projects'] as List;
+            projectsList = responseData['projects'] as List;
           } else if (responseData.containsKey('data')) {
-            data = responseData['data'] as List;
+            projectsList = responseData['data'] as List;
           } else if (responseData.containsKey('results')) {
-            data = responseData['results'] as List;
+            projectsList = responseData['results'] as List;
           } else {
             // If it's an object but doesn't contain expected keys, treat as empty
-            data = [];
+            projectsList = [];
           }
         } else {
-          data = [];
+          projectsList = [];
         }
         
         // Extract tickets from projects and filter by status
         List<Map<String, dynamic>> allTickets = [];
         
-        for (var project in data) {
+        for (var project in projectsList) {
           if (project != null && project is Map<String, dynamic>) {
-            if (project['tickets'] != null && project['tickets'] is List) {
-              for (var ticket in project['tickets']) {
+            // Look for both 'tickets' and 'open_tickets' keys
+            List<dynamic>? ticketsList;
+            if (project['open_tickets'] != null && project['open_tickets'] is List) {
+              ticketsList = project['open_tickets'] as List;
+            } else if (project['tickets'] != null && project['tickets'] is List) {
+              ticketsList = project['tickets'] as List;
+            }
+            
+            if (ticketsList != null) {
+              for (var ticket in ticketsList) {
                 if (ticket != null && ticket is Map<String, dynamic>) {
                   // Only include tickets with status 'to_read' or 'processing'
                   // Exclude 'accepted' and 'rejected' tickets
