@@ -10,6 +10,7 @@ import 'client_projects_screen.dart';
 import 'client_tasks_screen.dart';
 import 'create_ticket_screen.dart';
 import 'staff_tasks_screen.dart';
+import 'admin_tasks_screen.dart';
 
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
@@ -545,9 +546,11 @@ Widget _buildAdminStaffQuickActions() {
         onTap: () => _openProjectsScreen(context),
       ),
       _buildActionButton(
-        icon: Icons.task_outlined,
-        label: 'Tasks',
-        onTap: () => _openStaffTasksScreen(context),
+        icon: widget.user.isAdmin ? Icons.admin_panel_settings : Icons.task_outlined,
+        label: widget.user.isAdmin ? 'Admin Tasks' : 'My Tasks',
+        onTap: () => widget.user.isAdmin 
+            ? _openAdminTasksScreen(context)
+            : _openStaffTasksScreen(context),
       ),
       _buildActionButton(
         icon: Icons.people_outlined,
@@ -732,6 +735,37 @@ void _openStaffTasksScreen(BuildContext context) {
   Navigator.of(context).push(
     PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => StaffTasksScreen(user: widget.user),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = 0.0;
+        const end = 1.0;
+        const curve = Curves.elasticOut;
+
+        var scaleAnimation = Tween(begin: begin, end: end).animate(
+          CurvedAnimation(parent: animation, curve: curve),
+        );
+
+        var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+        );
+
+        return ScaleTransition(
+          scale: scaleAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 800),
+    ),
+  );
+}
+
+// Add new method for admin tasks navigation
+void _openAdminTasksScreen(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => AdminTasksScreen(user: widget.user),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         const begin = 0.0;
         const end = 1.0;

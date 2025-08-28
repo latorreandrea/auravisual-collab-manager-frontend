@@ -4,20 +4,20 @@ import '../services/task_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_nav_bar.dart';
 
-/// Staff Tasks screen - shows tasks assigned to the current staff member
-class StaffTasksScreen extends StatefulWidget {
+/// Admin Tasks screen - shows tasks assigned to the admin user with time tracking functionality
+class AdminTasksScreen extends StatefulWidget {
   final User user;
 
-  const StaffTasksScreen({
+  const AdminTasksScreen({
     super.key,
     required this.user,
   });
 
   @override
-  State<StaffTasksScreen> createState() => _StaffTasksScreenState();
+  State<AdminTasksScreen> createState() => _AdminTasksScreenState();
 }
 
-class _StaffTasksScreenState extends State<StaffTasksScreen>
+class _AdminTasksScreenState extends State<AdminTasksScreen>
     with TickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
@@ -39,11 +39,14 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
     {'value': 'completed', 'label': 'Completed'},
   ];
 
+  // Admin color scheme - using gradient colors for distinction
+  final Color _adminColor = AppTheme.gradientStart; // Purple color for admin tasks
+
   @override
   void initState() {
     super.initState();
     _setupAnimations();
-    _loadStaffTasks();
+    _loadAdminTasks();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -72,15 +75,15 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
     _controller.forward();
   }
 
-  Future<void> _loadStaffTasks() async {
+  Future<void> _loadAdminTasks() async {
     try {
       setState(() {
         isLoading = true;
         errorMessage = null;
       });
 
-      // Load staff's assigned tasks and active timer
-      final tasksList = await TaskService.getMyTasks();
+      // Load all tasks (admin can see all tasks) and active timer
+      final tasksList = await TaskService.getAllTasks();
       final timer = await TaskService.getActiveTimer();
       
       // Sort by status (in_progress first) then by creation date
@@ -105,46 +108,50 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
         isLoading = false;
       });
 
-      // Show notification if there's an active timer
+      // Show notification if there's an active timer for admin's own tasks
       if (timer != null && mounted) {
-        final activeTaskName = tasksList.firstWhere(
+        final activeTask = tasksList.firstWhere(
           (task) => task['id'].toString() == timer['task_id'].toString(),
-          orElse: () => {'action': 'Unknown Task'},
-        )['action'];
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.timer, color: Colors.white),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text('⏱️ Timer active for: $activeTaskName\nStarted: ${_formatDateTime(timer['start_time'])}'),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'VIEW',
-              textColor: Colors.white,
-              onPressed: () {
-                final activeTask = tasksList.firstWhere(
-                  (task) => task['id'].toString() == timer['task_id'].toString(),
-                  orElse: () => {},
-                );
-                if (activeTask.isNotEmpty) {
-                  _showTaskDetails(activeTask);
-                }
-              },
-            ),
-          ),
+          orElse: () => {'action': 'Unknown Task', 'assigned_to_id': null},
         );
+        
+        // Only show notification if it's admin's own task
+        if (_isTaskAssignedToMe(activeTask)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.timer, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('⏱️ Timer active for: ${activeTask['action']}\nStarted: ${_formatDateTime(timer['start_time'])}'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'VIEW',
+                textColor: Colors.white,
+                onPressed: () => _showTaskDetails(activeTask),
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Loaded ${tasksList.length} tasks (all projects)'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Loaded ${tasksList.length} tasks'),
+            content: Text('✅ Loaded ${tasksList.length} tasks (all projects)'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
@@ -169,7 +176,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
             duration: const Duration(seconds: 3),
             action: SnackBarAction(
               label: 'Retry',
-              onPressed: _loadStaffTasks,
+              onPressed: _loadAdminTasks,
             ),
           ),
         );
@@ -225,18 +232,18 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
     return Scaffold(
       backgroundColor: AppTheme.lightColor,
       appBar: AppBar(
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: _adminColor,
         elevation: 0,
         title: Row(
           children: [
             Icon(
-              Icons.task_alt,
+              Icons.admin_panel_settings,
               color: Colors.white,
               size: 28,
             ),
             const SizedBox(width: 12),
             const Text(
-              'My Tasks',
+              'Admin Tasks',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -248,7 +255,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           IconButton(
-            onPressed: _loadStaffTasks,
+            onPressed: _loadAdminTasks,
             icon: Icon(
               isLoading ? Icons.refresh : Icons.refresh_outlined,
               color: Colors.white,
@@ -273,8 +280,8 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
   Widget _buildContent() {
     return Column(
       children: [
-        // Stats and filters header
-        _buildHeader(),
+        // Admin header with active timer info
+        _buildAdminHeader(),
         
         // Search bar
         Padding(
@@ -297,16 +304,17 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
             child: Row(
               children: [
                 Icon(
-                  Icons.sort_by_alpha,
+                  Icons.admin_panel_settings,
                   size: 16,
-                  color: AppTheme.darkColor.withValues(alpha: 0.5),
+                  color: _adminColor.withValues(alpha: 0.7),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Showing ${filteredTasks.length} of ${tasks.length} tasks',
+                  'Admin tasks: ${filteredTasks.length} of ${tasks.length}',
                   style: TextStyle(
-                    color: AppTheme.darkColor.withValues(alpha: 0.5),
+                    color: _adminColor.withValues(alpha: 0.7),
                     fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -321,7 +329,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildAdminHeader() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -330,7 +338,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            AppTheme.primaryColor,
+            _adminColor,
             AppTheme.gradientEnd,
           ],
         ),
@@ -339,11 +347,19 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Hello, ${widget.user.fullName?.isNotEmpty == true ? widget.user.fullName!.split(' ').first : widget.user.username}! 👋',
+            'Hello Admin, ${widget.user.fullName?.isNotEmpty == true ? widget.user.fullName!.split(' ').first : widget.user.username}! 👑',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 18,
               fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Viewing all tasks across projects',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 8),
@@ -352,7 +368,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
           if (activeTimer != null)
             Container(
               padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(top: 8),
               decoration: BoxDecoration(
                 color: Colors.orange.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
@@ -363,7 +379,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
                   Icon(Icons.timer, color: Colors.orange, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'Timer active on: ${activeTimer!['task_title'] ?? 'Unknown task'}',
+                    'Timer active on task: ${activeTimer!['task_title'] ?? 'Unknown task'}',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -374,6 +390,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
               ),
             ),
           
+          // Stats
           if (!isLoading && tasks.isNotEmpty)
             Row(
               children: [
@@ -388,6 +405,13 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
                   '${tasks.where((t) => t['status'] == 'completed').length}',
                   'Completed',
                   Icons.check_circle_outline,
+                  Colors.white70,
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  '${tasks.fold<int>(0, (sum, t) => sum + ((t['total_time_minutes'] as num?)?.toInt() ?? 0))}',
+                  'Minutes',
+                  Icons.schedule,
                   Colors.white70,
                 ),
               ],
@@ -437,7 +461,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryColor.withValues(alpha: 0.1),
+            color: _adminColor.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -446,8 +470,8 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search tasks...',
-          prefixIcon: Icon(Icons.search, color: AppTheme.primaryColor),
+          hintText: 'Search admin tasks...',
+          prefixIcon: Icon(Icons.search, color: _adminColor),
           suffixIcon: _searchController.text.isNotEmpty
             ? IconButton(
                 icon: const Icon(Icons.clear),
@@ -490,12 +514,12 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? AppTheme.primaryColor 
+                    ? _adminColor 
                     : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isSelected 
-                      ? AppTheme.primaryColor 
+                      ? _adminColor 
                       : Colors.grey.withValues(alpha: 0.3),
                 ),
               ),
@@ -534,17 +558,26 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
       itemCount: filteredTasks.length,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        return _buildTaskCard(filteredTasks[index]);
+        return _buildAdminTaskCard(filteredTasks[index]);
       },
     );
   }
 
-  Widget _buildTaskCard(Map<String, dynamic> task) {
+  /// Check if a task is assigned to the current admin user
+  bool _isTaskAssignedToMe(Map<String, dynamic> task) {
+    final assignedUserId = task['assigned_to']?.toString();
+    final currentUserId = widget.user.id.toString();
+    return assignedUserId == currentUserId;
+  }
+
+  Widget _buildAdminTaskCard(Map<String, dynamic> task) {
     final status = task['status'] ?? 'in_progress';
     final isCompleted = status == 'completed';
     final priority = task['priority'] ?? 'medium';
     final taskId = task['id']?.toString() ?? '';
     final hasActiveTimer = activeTimer != null && activeTimer!['task_id'] == taskId;
+    final isAssignedToMe = _isTaskAssignedToMe(task);
+    final assignedToName = task['assigned_to_name'] ?? 'Unassigned';
     
     return Container(
       decoration: BoxDecoration(
@@ -558,24 +591,38 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
           ),
         ],
         border: Border.all(
-          color: _getPriorityColor(priority).withValues(alpha: 0.2),
-          width: 1,
+          color: isAssignedToMe 
+              ? _adminColor.withValues(alpha: 0.5) // Special color for admin's own tasks
+              : Colors.grey.withValues(alpha: 0.2), // Regular border for other tasks
+          width: isAssignedToMe ? 2 : 1,
         ),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        title: Text(
-          task['action'] ?? 'Untitled Task',
-          style: TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 16,
-            decoration: isCompleted ? TextDecoration.lineThrough : null,
-            color: isCompleted 
-                ? AppTheme.darkColor.withValues(alpha: 0.6)
-                : AppTheme.darkColor,
-          ),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          children: [
+            Icon(
+              isAssignedToMe ? Icons.admin_panel_settings : Icons.task,
+              color: isAssignedToMe ? _adminColor : AppTheme.primaryColor,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                task['action'] ?? 'Untitled Task',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                  color: isCompleted 
+                      ? AppTheme.darkColor.withValues(alpha: 0.6)
+                      : AppTheme.darkColor,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,11 +632,23 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
               Text(
                 'Project: ${task['project_name']}',
                 style: TextStyle(
-                  color: AppTheme.primaryColor,
+                  color: isAssignedToMe ? _adminColor : AppTheme.primaryColor,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
               ),
+            const SizedBox(height: 4),
+            // Show assigned user for admin view
+            Text(
+              'Assigned to: $assignedToName${isAssignedToMe ? ' (You)' : ''}',
+              style: TextStyle(
+                color: isAssignedToMe 
+                    ? _adminColor.withValues(alpha: 0.8)
+                    : AppTheme.darkColor.withValues(alpha: 0.6),
+                fontSize: 12,
+                fontWeight: isAssignedToMe ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
             const SizedBox(height: 6),
             Row(
               children: [
@@ -624,7 +683,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
                     ),
                   ),
                 ),
-                if (hasActiveTimer) ...[
+                if (hasActiveTimer && isAssignedToMe) ...[
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -689,8 +748,8 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
                 ),
               ),
             const SizedBox(width: 8),
-            // Time tracking button
-            if (!isCompleted)
+            // Time tracking button - only for admin's own tasks
+            if (!isCompleted && isAssignedToMe)
               IconButton(
                 onPressed: () => _toggleTimer(task),
                 icon: Icon(
@@ -699,408 +758,37 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
                 ),
                 tooltip: hasActiveTimer ? 'Stop timer' : 'Start timer',
               ),
-            // Status toggle button
-            if (!isCompleted)
-              IconButton(
-                onPressed: () => _toggleTaskStatus(task),
-                icon: Icon(
-                  Icons.check_circle_outline,
-                  color: Colors.green,
+            // Status toggle button - only for admin's own tasks
+            if (isAssignedToMe) ...[
+              if (!isCompleted)
+                IconButton(
+                  onPressed: () => _toggleTaskStatus(task),
+                  icon: Icon(
+                    Icons.check_circle_outline,
+                    color: Colors.green,
+                  ),
+                  tooltip: 'Mark as completed',
+                )
+              else
+                IconButton(
+                  onPressed: () => _toggleTaskStatus(task),
+                  icon: Icon(
+                    Icons.undo,
+                    color: Colors.orange,
+                  ),
+                  tooltip: 'Mark as in progress',
                 ),
-                tooltip: 'Mark as completed',
-              )
-            else
-              IconButton(
-                onPressed: () => _toggleTaskStatus(task),
-                icon: Icon(
-                  Icons.undo,
-                  color: Colors.orange,
-                ),
-                tooltip: 'Mark as in progress',
+            ] else ...[
+              // View-only indicator for other users' tasks
+              Icon(
+                Icons.visibility,
+                color: Colors.grey,
+                size: 20,
               ),
+            ],
           ],
         ),
         onTap: () => _showTaskDetails(task),
-      ),
-    );
-  }
-
-  Widget _buildTasksListLoading() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 5,
-      itemBuilder: (context, index) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 16,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              height: 12,
-              width: 200,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.task_outlined,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No tasks assigned',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your assigned tasks will appear here',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNoSearchResults() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No tasks found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search or filter',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red.shade400,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Error loading tasks',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.red.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            errorMessage ?? 'Unknown error occurred',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _loadStaffTasks,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showTaskDetails(Map<String, dynamic> task) {
-    final taskId = task['id']?.toString() ?? '';
-    final hasActiveTimer = activeTimer != null && activeTimer!['task_id'] == taskId;
-    
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.grey.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      task['action'] ?? 'Task Details',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.primaryColor,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                    color: AppTheme.darkColor,
-                  ),
-                ],
-              ),
-            ),
-            
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (task['project_name']?.isNotEmpty == true)
-                      _buildDetailRow('Project', task['project_name']),
-                    _buildDetailRow('Status', _getStatusDisplayName(task['status'] ?? '')),
-                    _buildDetailRow('Priority', (task['priority'] ?? 'medium').toUpperCase()),
-                    if (task['total_time_minutes'] != null && task['total_time_minutes'] > 0)
-                      _buildDetailRow('Time Logged', '${task['total_time_minutes']} minutes'),
-                    if (task['time_sessions_count'] != null && task['time_sessions_count'] > 0)
-                      _buildDetailRow('Sessions', '${task['time_sessions_count']} work sessions'),
-                    if (task['created_at'] != null)
-                      _buildDetailRow('Created', _formatDate(task['created_at'])),
-                    
-                    if (hasActiveTimer) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(Icons.timer, color: Colors.orange, size: 32),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Timer Active',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.orange,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              'Started: ${_formatDateTime(activeTimer!['start_time'])}',
-                              style: TextStyle(
-                                color: Colors.orange.shade700,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            
-            // Actions
-            Container(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  // Timer button
-                  if (task['status'] != 'completed')
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          try {
-                            if (hasActiveTimer) {
-                              // Stop timer and close modal
-                              await _toggleTimer(task);
-                              if (mounted) Navigator.pop(context);
-                            } else {
-                              // Start timer and update modal state
-                              await _toggleTimer(task);
-                              // Note: We can't use setModalState here as it's not StatefulBuilder
-                              // So we close and reopen the modal to show the updated state
-                              if (mounted) {
-                                Navigator.pop(context);
-                                _showTaskDetails(task);
-                              }
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Timer error: $e')),
-                              );
-                            }
-                          }
-                        },
-                        icon: Icon(
-                          hasActiveTimer ? Icons.stop : Icons.play_arrow,
-                        ),
-                        label: Text(
-                          hasActiveTimer ? 'Stop Timer & Close' : 'Start Timer',
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: hasActiveTimer ? Colors.red : Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Status button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        if (mounted) Navigator.pop(context);
-                        _toggleTaskStatus(task);
-                      },
-                      icon: Icon(
-                        task['status'] == 'completed' 
-                            ? Icons.undo 
-                            : Icons.check_circle,
-                      ),
-                      label: Text(
-                        task['status'] == 'completed' 
-                            ? 'Mark as In Progress' 
-                            : 'Mark as Completed',
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: task['status'] == 'completed' 
-                            ? Colors.orange 
-                            : AppTheme.primaryColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                color: AppTheme.darkColor.withValues(alpha: 0.7),
-                fontSize: 14,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: AppTheme.darkColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1179,7 +867,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
       }
       
       // Reload tasks to get updated time
-      _loadStaffTasks();
+      _loadAdminTasks();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1192,6 +880,443 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
         );
       }
     }
+  }
+
+  Widget _buildTasksListLoading() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: 5,
+      itemBuilder: (context, index) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _adminColor.withValues(alpha: 0.3), width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 16,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              height: 12,
+              width: 200,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.admin_panel_settings_outlined,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No admin tasks assigned',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your assigned admin tasks will appear here',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNoSearchResults() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'No admin tasks found',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your search or filter',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.red.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading admin tasks',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.red.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            errorMessage ?? 'Unknown error occurred',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _loadAdminTasks,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _adminColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTaskDetails(Map<String, dynamic> task) {
+    final isAssignedToMe = _isTaskAssignedToMe(task);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final taskId = task['id']?.toString() ?? '';
+          final hasActiveTimer = activeTimer != null && activeTimer!['task_id'] == taskId;
+          
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.7,
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Header with admin styling
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: isAssignedToMe 
+                        ? _adminColor.withValues(alpha: 0.1)
+                        : Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                    border: Border(
+                      bottom: BorderSide(
+                        color: isAssignedToMe
+                            ? _adminColor.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.2),
+                        width: 1,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isAssignedToMe
+                              ? _adminColor.withValues(alpha: 0.2)
+                              : Colors.grey.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          isAssignedToMe ? Icons.admin_panel_settings : Icons.visibility,
+                          color: isAssignedToMe ? _adminColor : Colors.grey,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          task['action'] ?? 'Task Details',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isAssignedToMe ? _adminColor : Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                        color: AppTheme.darkColor,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (task['project_name']?.isNotEmpty == true)
+                          _buildDetailRow('Project', task['project_name']),
+                        _buildDetailRow('Assigned to', task['assigned_to_name'] ?? 'Unassigned'),
+                        _buildDetailRow('Status', _getStatusDisplayName(task['status'] ?? '')),
+                        _buildDetailRow('Priority', (task['priority'] ?? 'medium').toUpperCase()),
+                        if (task['total_time_minutes'] != null && task['total_time_minutes'] > 0)
+                          _buildDetailRow('Time Logged', '${task['total_time_minutes']} minutes'),
+                        if (task['time_sessions_count'] != null && task['time_sessions_count'] > 0)
+                          _buildDetailRow('Sessions', '${task['time_sessions_count']} work sessions'),
+                        if (task['created_at'] != null)
+                          _buildDetailRow('Created', _formatDate(task['created_at'])),
+                        
+                        if (hasActiveTimer && isAssignedToMe) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(Icons.timer, color: Colors.orange, size: 32),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Timer Active',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Text(
+                                  'Started: ${_formatDateTime(activeTimer!['start_time'])}',
+                                  style: TextStyle(
+                                    color: Colors.orange.shade700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Actions - only for assigned tasks
+                if (isAssignedToMe)
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        // Timer button
+                        if (task['status'] != 'completed')
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  if (hasActiveTimer) {
+                                    // Stop timer and close modal
+                                    await _toggleTimer(task);
+                                    if (mounted) Navigator.pop(context);
+                                  } else {
+                                    // Start timer and update modal state
+                                    await _toggleTimer(task);
+                                    setModalState(() {}); // Refresh modal
+                                    setState(() {}); // Refresh main screen
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Timer error: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                              icon: Icon(
+                                hasActiveTimer ? Icons.stop : Icons.play_arrow,
+                              ),
+                              label: Text(
+                                hasActiveTimer ? 'Stop Timer & Close' : 'Start Timer',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: hasActiveTimer ? Colors.red : Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // Status button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              if (mounted) Navigator.pop(context);
+                              _toggleTaskStatus(task);
+                            },
+                            icon: Icon(
+                              task['status'] == 'completed' 
+                                  ? Icons.undo 
+                                  : Icons.check_circle,
+                            ),
+                            label: Text(
+                              task['status'] == 'completed' 
+                                  ? 'Mark as In Progress' 
+                                  : 'Mark as Completed',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: task['status'] == 'completed' 
+                                  ? Colors.orange 
+                                  : _adminColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  // View-only message for other users' tasks
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.visibility, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Text(
+                            'View Only - Task assigned to ${task['assigned_to_name']}',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: AppTheme.darkColor.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: AppTheme.darkColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _toggleTaskStatus(Map<String, dynamic> task) async {
@@ -1210,7 +1335,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Task marked as ${newStatus == 'completed' ? 'completed' : 'in progress'}'),
+            content: Text('✅ Admin task marked as ${newStatus == 'completed' ? 'completed' : 'in progress'}'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
@@ -1221,7 +1346,7 @@ class _StaffTasksScreenState extends State<StaffTasksScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Failed to update task: $error'),
+            content: Text('❌ Failed to update admin task: $error'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),

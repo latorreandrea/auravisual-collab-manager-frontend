@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../services/task_service.dart';
@@ -28,6 +29,7 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
   List<Map<String, dynamic>> filteredTasks = [];
   bool isLoading = true;
   String? errorMessage;
+  Timer? _refreshTimer;
   
   final TextEditingController _searchController = TextEditingController();
   String _selectedStatus = 'all';
@@ -38,6 +40,13 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
     _setupAnimations();
     _loadClientTasks();
     _searchController.addListener(_onSearchChanged);
+    
+    // Auto-refresh every 30 seconds to update timer status
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted && !isLoading) {
+        _loadClientTasks(showSuccessMessage: false);
+      }
+    });
   }
 
   void _setupAnimations() {
@@ -65,7 +74,7 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
     _controller.forward();
   }
 
-  Future<void> _loadClientTasks() async {
+  Future<void> _loadClientTasks({bool showSuccessMessage = true}) async {
     try {
       setState(() {
         isLoading = true;
@@ -88,7 +97,7 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
         isLoading = false;
       });
 
-      if (mounted) {
+      if (mounted && showSuccessMessage) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('✅ Loaded ${tasksList.length} tasks'),
@@ -115,7 +124,7 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
             duration: const Duration(seconds: 3),
             action: SnackBarAction(
               label: 'Retry',
-              onPressed: _loadClientTasks,
+              onPressed: () => _loadClientTasks(),
             ),
           ),
         );
@@ -168,6 +177,7 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
   void dispose() {
     _controller.dispose();
     _searchController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -475,78 +485,166 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
     final statusColor = _getStatusColor(status);
     final createdAt = DateTime.tryParse(task['created_at'] ?? '') ?? DateTime.now();
     final daysAgo = DateTime.now().difference(createdAt).inDays;
+    final isBeingWorkedOn = task['is_being_worked_on'] == true;
+    final activeTimer = task['active_timer'];
     
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      title: Text(
-        task['title'] ?? 'Untitled Task',
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 16,
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isBeingWorkedOn 
+              ? Colors.green.withValues(alpha: 0.3)
+              : Colors.grey.withValues(alpha: 0.1),
+          width: isBeingWorkedOn ? 2 : 1,
         ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                task['title'] ?? 'Untitled Task',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
                 ),
-                child: Text(
-                  _getStatusDisplayName(status),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (isBeingWorkedOn) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 8),
-              if (task['project_name']?.isNotEmpty == true) ...[
-                Expanded(
+            ],
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   child: Text(
-                    task['project_name'],
+                    _getStatusDisplayName(status),
                     style: TextStyle(
-                      color: AppTheme.darkColor.withValues(alpha: 0.5),
+                      color: statusColor,
                       fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 8),
+                if (task['project_name']?.isNotEmpty == true) ...[
+                  Expanded(
+                    child: Text(
+                      task['project_name'],
+                      style: TextStyle(
+                        color: AppTheme.darkColor.withValues(alpha: 0.5),
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ],
-            ],
-          ),
-        ],
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            daysAgo == 0 ? 'Today' : 
-            daysAgo == 1 ? '1 day ago' : 
-            '$daysAgo days ago',
-            style: TextStyle(
-              color: AppTheme.darkColor.withValues(alpha: 0.5),
-              fontSize: 11,
             ),
-          ),
-          const SizedBox(height: 4),
-          Icon(
-            Icons.chevron_right,
-            color: AppTheme.darkColor.withValues(alpha: 0.4),
-            size: 18,
-          ),
-        ],
+            if (isBeingWorkedOn && activeTimer != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.person_outline, size: 12, color: Colors.green),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Staff is working on this task',
+                    style: TextStyle(
+                      color: Colors.green.shade700,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (activeTimer['start_time'] != null) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      '• Started ${_formatTimeAgo(activeTimer['start_time'])}',
+                      style: TextStyle(
+                        color: Colors.green.shade600,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              daysAgo == 0 ? 'Today' : 
+              daysAgo == 1 ? '1 day ago' : 
+              '$daysAgo days ago',
+              style: TextStyle(
+                color: AppTheme.darkColor.withValues(alpha: 0.5),
+                fontSize: 11,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Icon(
+              Icons.chevron_right,
+              color: AppTheme.darkColor.withValues(alpha: 0.4),
+              size: 18,
+            ),
+          ],
+        ),
+        onTap: () => _showTaskDetails(task),
       ),
-      onTap: () => _showTaskDetails(task),
     );
   }
 
@@ -711,6 +809,8 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
     final status = task['status'] ?? 'pending';
     final statusColor = _getStatusColor(status);
     final createdAt = DateTime.tryParse(task['created_at'] ?? '') ?? DateTime.now();
+    final isBeingWorkedOn = task['is_being_worked_on'] == true;
+    final activeTimer = task['active_timer'];
     
     showModalBottomSheet(
       context: context,
@@ -749,13 +849,53 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          task['title'] ?? 'Untitled Task',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primaryColor,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                task['title'] ?? 'Untitled Task',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                            ),
+                            if (isBeingWorkedOn) ...[
+                              const SizedBox(width: 12),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: Colors.green,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'BEING WORKED ON',
+                                      style: TextStyle(
+                                        color: Colors.green.shade700,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
+                        const SizedBox(height: 8),
                         Text(
                           _getStatusDisplayName(status),
                           style: TextStyle(
@@ -783,12 +923,95 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Active work status
+                    if (isBeingWorkedOn && activeTimer != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.person_2_outlined, color: Colors.green, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Team Member Active',
+                                  style: TextStyle(
+                                    color: Colors.green.shade700,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'A team member is currently working on this task.',
+                              style: TextStyle(
+                                color: Colors.green.shade600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (activeTimer['start_time'] != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Started: ${_formatTimeAgo(activeTimer['start_time'])}',
+                                style: TextStyle(
+                                  color: Colors.green.shade600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    
                     // Task details
                     _buildDetailRow('Project', task['project_name'] ?? 'No project assigned'),
                     _buildDetailRow('Status', _getStatusDisplayName(status)),
                     _buildDetailRow('Created', '${createdAt.day}/${createdAt.month}/${createdAt.year}'),
                     if (task['assigned_to_name']?.isNotEmpty == true)
                       _buildDetailRow('Assigned to', task['assigned_to_name']),
+                    if (task['total_time_minutes'] != null && task['total_time_minutes'] > 0)
+                      _buildDetailRow('Time logged', '${task['total_time_minutes']} minutes'),
+                    
+                    // Ticket context
+                    if (task['ticket_message']?.isNotEmpty == true) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Ticket Context',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.darkColor,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.primaryColor.withValues(alpha: 0.1)),
+                        ),
+                        child: Text(
+                          task['ticket_message'],
+                          style: TextStyle(
+                            color: AppTheme.darkColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                     
                     const SizedBox(height: 20),
                   ],
@@ -862,6 +1085,26 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
         return 'Cancelled';
       default:
         return status.toUpperCase();
+    }
+  }
+
+  String _formatTimeAgo(String dateTimeString) {
+    try {
+      final dateTime = DateTime.parse(dateTimeString);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+      
+      if (difference.inMinutes < 1) {
+        return 'just now';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}h ago';
+      } else {
+        return '${difference.inDays}d ago';
+      }
+    } catch (e) {
+      return 'recently';
     }
   }
 
