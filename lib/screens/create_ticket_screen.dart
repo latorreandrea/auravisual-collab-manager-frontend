@@ -10,10 +10,12 @@ import '../widgets/app_nav_bar.dart';
 /// Create Ticket screen - allows clients to create tickets for their projects
 class CreateTicketScreen extends StatefulWidget {
   final User user;
+  final Project? preSelectedProject;
 
   const CreateTicketScreen({
     super.key,
     required this.user,
+    this.preSelectedProject,
   });
 
   @override
@@ -80,6 +82,14 @@ class _CreateTicketScreenState extends State<CreateTicketScreen>
       setState(() {
         _availableProjects = projects;
         _isLoadingProjects = false;
+        
+        // Auto-select pre-selected project if provided
+        if (widget.preSelectedProject != null) {
+          _selectedProject = projects.firstWhere(
+            (p) => p.id == widget.preSelectedProject!.id,
+            orElse: () => widget.preSelectedProject!,
+          );
+        }
       });
     } catch (error) {
       setState(() {
@@ -361,6 +371,31 @@ class _CreateTicketScreenState extends State<CreateTicketScreen>
                 color: AppTheme.primaryColor,
               ),
             ),
+            if (widget.preSelectedProject != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, size: 12, color: Colors.green),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Pre-selected',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 8),
@@ -413,7 +448,7 @@ class _CreateTicketScreenState extends State<CreateTicketScreen>
                             isExpanded: true,
                             hint: const Row(
                               children: [
-                                Icon(Icons.folder_outlined),
+                                Icon(Icons.business),
                                 SizedBox(width: 12),
                                 Text('Select a project'),
                               ],

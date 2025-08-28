@@ -9,6 +9,7 @@ import 'projects_screen.dart';
 import 'client_projects_screen.dart';
 import 'client_tasks_screen.dart';
 import 'create_ticket_screen.dart';
+import 'staff_tasks_screen.dart';
 
 /// Welcome screen - shown after successful login
 /// Displays personalized greeting and user role (if not client)
@@ -443,8 +444,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ? clientData!.projectNames.join(', ')
                   : 'No projects assigned'),
           _buildInsightRow('Total Projects', '${clientData!.totalProjects}'),
-          _buildInsightRow('Current Plan', clientData!.primaryPlan),
           _buildInsightRow('Open Tickets', '${clientData!.openTicketsCount}'),
+          if (clientData!.totalTasks > 0) ...[
+            _buildInsightRow('Active Tasks', '${clientData!.activeTasks}'),
+            _buildInsightRow('Completed Tasks', '${clientData!.completedTasks}'),
+          ],
+          _buildInsightRow('Current Plan', clientData!.primaryPlan),
         ],
       );
     }
@@ -542,7 +547,7 @@ Widget _buildAdminStaffQuickActions() {
       _buildActionButton(
         icon: Icons.task_outlined,
         label: 'Tasks',
-        onTap: () => _showComingSoon(context, 'Task management coming soon! 📋'),
+        onTap: () => _openStaffTasksScreen(context),
       ),
       _buildActionButton(
         icon: Icons.people_outlined,
@@ -597,7 +602,7 @@ Widget _buildActionButton({
 
 // Update the projects screen navigation to handle client users
 void _openProjectsScreen(BuildContext context) {
-  if (widget.user.isAdmin) {
+  if (widget.user.isAdmin || widget.user.isStaff) {
     Navigator.of(context).push(
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => ProjectsScreen(user: widget.user),
@@ -696,6 +701,37 @@ void _openCreateTicketScreen(BuildContext context) {
   Navigator.of(context).push(
     PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => CreateTicketScreen(user: widget.user),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = 0.0;
+        const end = 1.0;
+        const curve = Curves.elasticOut;
+
+        var scaleAnimation = Tween(begin: begin, end: end).animate(
+          CurvedAnimation(parent: animation, curve: curve),
+        );
+
+        var fadeAnimation = Tween(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeInOut),
+        );
+
+        return ScaleTransition(
+          scale: scaleAnimation,
+          child: FadeTransition(
+            opacity: fadeAnimation,
+            child: child,
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 800),
+    ),
+  );
+}
+
+// Add new method for staff tasks navigation
+void _openStaffTasksScreen(BuildContext context) {
+  Navigator.of(context).push(
+    PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => StaffTasksScreen(user: widget.user),
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         const begin = 0.0;
         const end = 1.0;

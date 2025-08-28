@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:developer' as developer;
 import '../utils/constants.dart';
 import 'auth_service.dart';
+import 'client_task_service.dart';
 
 /// Service for dashboard-related API calls
 class DashboardService {
@@ -48,7 +49,7 @@ class DashboardService {
   }
 
   /// Get client projects (client only)
-  /// Uses GET /client/projects endpoint
+  /// Uses GET /client/projects endpoint and GET /client/tickets for task stats
   static Future<ClientDashboardData> getClientDashboardData() async {
     try {
       final token = await AuthService().getToken();
@@ -70,7 +71,20 @@ class DashboardService {
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
-        return ClientDashboardData.fromJson(responseData);
+        
+        // Load task statistics
+        Map<String, ProjectTaskStats> taskStats = {};
+        try {
+          taskStats = await ClientTaskService.getProjectTaskStats();
+        } catch (taskError) {
+          developer.log(
+            'Failed to load task stats in dashboard: $taskError',
+            name: 'DashboardService.getClientDashboardData',
+          );
+          // Continue without task stats
+        }
+        
+        return ClientDashboardData.fromJson(responseData, taskStats);
       } else {
         throw Exception('Failed to load client data: HTTP ${response.statusCode}');
       }
@@ -176,25 +190,46 @@ class ClientDashboardData {
   final int openTicketsCount;
   final List<String> projectNames;
   final String primaryPlan;
+  final int activeTasks;
+  final int completedTasks;
 
   const ClientDashboardData({
     required this.totalProjects,
     required this.openTicketsCount,
     required this.projectNames,
     required this.primaryPlan,
+    required this.activeTasks,
+    required this.completedTasks,
   });
 
-  factory ClientDashboardData.fromJson(Map<String, dynamic> json) {
+  int get totalTasks => activeTasks + completedTasks;
+
+  factory ClientDashboardData.fromJson(
+    Map<String, dynamic> json, 
+    [Map<String, ProjectTaskStats>? taskStats]
+  ) {
     final projects = json['projects'] as List<dynamic>? ?? [];
     final projectNames = projects.map((p) => p['name'] as String? ?? 'Unnamed Project').toList();
     final openTickets = projects.fold<int>(0, (sum, p) => sum + (p['open_tickets_count'] as int? ?? 0));
     final primaryPlan = projects.isNotEmpty ? (projects[0]['plan'] as String? ?? 'No Plan') : 'No Plan';
+
+    // Calculate task statistics
+    int activeTasks = 0;
+    int completedTasks = 0;
+    if (taskStats != null) {
+      for (final stats in taskStats.values) {
+        activeTasks += stats.activeTasks;
+        completedTasks += stats.completedTasks;
+      }
+    }
 
     return ClientDashboardData(
       totalProjects: json['total_projects'] ?? 0,
       openTicketsCount: openTickets,
       projectNames: projectNames,
       primaryPlan: primaryPlan,
+      activeTasks: activeTasks,
+      completedTasks: completedTasks,
     );
   }
 }

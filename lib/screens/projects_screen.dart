@@ -8,7 +8,7 @@ import '../widgets/app_nav_bar.dart';
 import 'create_project_screen.dart';
 
 /// Projects screen - shows list of all projects with tickets and tasks
-/// Only accessible by admin users
+/// Accessible by admin and staff users (staff has read-only access)
 class ProjectsScreen extends StatefulWidget {
   final User user;
 
@@ -415,7 +415,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                 label: 'All Projects',
                 isSelected: _filterOption == 'all',
                 onTap: () => _onFilterChanged('all'),
-                icon: Icons.folder_outlined,
+                icon: Icons.list_alt,
               ),
               const SizedBox(width: 8),
               _buildFilterChip(
@@ -603,7 +603,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                 child: _buildCompactStatCard(
                   'Projects',
                   totalProjects.toString(),
-                  Icons.folder_outlined,
+                  Icons.dashboard,
                   AppTheme.primaryColor,
                 ),
               ),
@@ -612,7 +612,7 @@ class _ProjectsScreenState extends State<ProjectsScreen>
                 child: _buildCompactStatCard(
                   'Active',
                   activeProjects.toString(),
-                  Icons.play_circle_outline,
+                  Icons.trending_up,
                   Colors.blue,
                 ),
               ),

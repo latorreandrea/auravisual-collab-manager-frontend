@@ -9,7 +9,7 @@ import 'auth_service.dart';
 class ProjectService {
   static const String _baseUrl = AppConstants.baseUrl;
 
-  /// Get all projects (admin only)
+  /// Get all projects (admin and staff access)
   static Future<List<Project>> getAllProjects() async {
     try {
       final token = await AuthService().getToken();
@@ -30,7 +30,7 @@ class ProjectService {
         
         return projectsData.map((projectJson) => Project.fromJson(projectJson)).toList();
       } else if (response.statusCode == 403) {
-        throw Exception('Access denied. Admin privileges required.');
+        throw Exception('Access denied. Admin or Staff privileges required.');
       } else {
         throw Exception('Failed to load projects: HTTP ${response.statusCode}');
       }

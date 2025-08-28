@@ -711,7 +711,7 @@ Widget build(BuildContext context) {
                         child: _buildStatCard(
                           'Active Projects',
                           '${client.activeProjectsCount}',
-                          Icons.folder_open,
+                          Icons.trending_up,
                           Colors.blue,
                         ),
                       ),
@@ -720,7 +720,7 @@ Widget build(BuildContext context) {
                         child: _buildStatCard(
                           'Total Projects',
                           '${client.totalProjectsCount}',
-                          Icons.folder,
+                          Icons.assessment,
                           Colors.green,
                         ),
                       ),

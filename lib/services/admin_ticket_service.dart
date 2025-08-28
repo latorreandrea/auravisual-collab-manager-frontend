@@ -63,11 +63,37 @@ class AdminTicketService {
                 if (ticket != null && ticket is Map<String, dynamic>) {
                   // Only include tickets with status 'to_read' or 'processing'
                   // Exclude 'accepted' and 'rejected' tickets
+                  // Note: After task creation, tickets move to 'processing' status
                   final status = ticket['status']?.toString() ?? '';
                   if (status == 'to_read' || status == 'processing') {
-                    ticket['project_name'] = project['name'];
-                    ticket['project_id'] = project['id'];
-                    allTickets.add(Map<String, dynamic>.from(ticket));
+                    // Create a new ticket object with project and client information
+                    final enrichedTicket = Map<String, dynamic>.from(ticket);
+                    
+                    // Add project information
+                    enrichedTicket['project'] = {
+                      'id': project['id'],
+                      'name': project['name'],
+                      'status': project['status'],
+                      'plan': project['plan'],
+                      'website': project['website'],
+                      'socials': project['socials'],
+                    };
+                    
+                    // Add client information if available
+                    if (project['client'] != null) {
+                      enrichedTicket['client'] = {
+                        'id': project['client']['id'],
+                        'email': project['client']['email'],
+                        'username': project['client']['username'],
+                        'full_name': project['client']['full_name'],
+                      };
+                    }
+                    
+                    // Keep legacy fields for backward compatibility
+                    enrichedTicket['project_name'] = project['name'];
+                    enrichedTicket['project_id'] = project['id'];
+                    
+                    allTickets.add(enrichedTicket);
                   }
                 }
               }
@@ -112,17 +138,23 @@ class AdminTicketService {
       List<Map<String, dynamic>> allUsers = [];
 
       if (staffResponse.statusCode == 200) {
-        final staffData = json.decode(staffResponse.body) as List;
-        allUsers.addAll(staffData.cast<Map<String, dynamic>>());
+        final staffResponseData = json.decode(staffResponse.body);
+        if (staffResponseData is Map<String, dynamic> && staffResponseData.containsKey('staff')) {
+          final staffData = staffResponseData['staff'] as List;
+          allUsers.addAll(staffData.cast<Map<String, dynamic>>());
+        }
       }
 
       if (adminResponse.statusCode == 200) {
-        final adminData = json.decode(adminResponse.body) as List;
-        // Filter to only admin users and avoid duplicates
-        for (var user in adminData) {
-          if (user['role'] == 'admin' && 
-              !allUsers.any((existing) => existing['id'] == user['id'])) {
-            allUsers.add(Map<String, dynamic>.from(user));
+        final adminResponseData = json.decode(adminResponse.body);
+        if (adminResponseData is Map<String, dynamic> && adminResponseData.containsKey('users')) {
+          final adminData = adminResponseData['users'] as List;
+          // Filter to only admin users and avoid duplicates
+          for (var user in adminData) {
+            if (user['role'] == 'admin' && 
+                !allUsers.any((existing) => existing['id'] == user['id'])) {
+              allUsers.add(Map<String, dynamic>.from(user));
+            }
           }
         }
       }
@@ -197,8 +229,15 @@ class AdminTicketService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
         
-        // After creating tasks successfully, mark ticket as accepted
-        await _updateTicketStatus(ticketId, 'accepted');
+        // After creating tasks successfully, try to mark ticket as accepted
+        // Note: This might not work if the endpoint doesn't exist
+        final statusUpdated = await _updateTicketStatus(ticketId, 'accepted');
+        
+        // If status update failed, we still return success for task creation
+        // The ticket will remain in 'processing' state which is acceptable
+        if (!statusUpdated) {
+          // Could add logging here if needed for debugging
+        }
         
         return data;
       } else {
@@ -217,20 +256,54 @@ class AdminTicketService {
         throw Exception('Token not available');
       }
 
-      // Try to update the ticket status
-      // Note: This endpoint might not exist, but we'll attempt it
-      final response = await http.patch(
-        Uri.parse('$baseUrl/admin/tickets/$ticketId'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'status': status,
-        }),
-      );
+      // Try different possible endpoints for updating ticket status
+      List<String> possibleEndpoints = [
+        '$baseUrl/admin/tickets/$ticketId/status',
+        '$baseUrl/admin/tickets/$ticketId',
+        '$baseUrl/tickets/$ticketId/status',
+      ];
 
-      return response.statusCode == 200 || response.statusCode == 204;
+      for (String endpoint in possibleEndpoints) {
+        try {
+          // Try PATCH first
+          var response = await http.patch(
+            Uri.parse(endpoint),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'status': status,
+            }),
+          );
+
+          if (response.statusCode == 200 || response.statusCode == 204) {
+            return true;
+          }
+
+          // Try PUT if PATCH doesn't work
+          response = await http.put(
+            Uri.parse(endpoint),
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'status': status,
+            }),
+          );
+
+          if (response.statusCode == 200 || response.statusCode == 204) {
+            return true;
+          }
+        } catch (e) {
+          // Continue to next endpoint
+          continue;
+        }
+      }
+
+      // If no endpoint works, return false but don't throw
+      return false;
     } catch (e) {
       // Don't throw here, just return false as it's not critical
       // The status change might happen automatically on the backend

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import '../models/user.dart';
 import '../models/project.dart';
 import '../services/project_service.dart';
+import '../services/client_task_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
 import '../widgets/app_nav_bar.dart';
+import 'create_ticket_screen.dart';
 
 /// Client Projects screen - shows client's own projects
 class ClientProjectsScreen extends StatefulWidget {
@@ -29,6 +31,8 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
   List<Project> filteredProjects = [];
   bool isLoading = true;
   String? errorMessage;
+  Map<String, ProjectTaskStats> projectTaskStats = {};
+  bool isLoadingTaskStats = false;
   
   final TextEditingController _searchController = TextEditingController();
   
@@ -76,6 +80,25 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
       // Load client's projects
       final projectsList = await ProjectService.getClientProjects();
       
+      // Load task statistics
+      setState(() {
+        isLoadingTaskStats = true;
+      });
+      
+      try {
+        final taskStats = await ClientTaskService.getProjectTaskStats();
+        setState(() {
+          projectTaskStats = taskStats;
+          isLoadingTaskStats = false;
+        });
+      } catch (taskError) {
+        // Don't fail the whole screen if task stats fail
+        setState(() {
+          projectTaskStats = {};
+          isLoadingTaskStats = false;
+        });
+      }
+      
       // Sort alphabetically by name
       projectsList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
@@ -101,6 +124,7 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
         isLoading = false;
         projects = [];
         filteredProjects = [];
+        isLoadingTaskStats = false;
       });
       
       if (mounted) {
@@ -398,19 +422,6 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
     
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          Icons.folder,
-          color: statusColor,
-          size: 24,
-        ),
-      ),
       title: Text(
         project.name,
         style: const TextStyle(
@@ -464,42 +475,128 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
           ),
         ],
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (project.openTicketsCount > 0) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.confirmation_number, size: 12, color: Colors.orange),
-                  const SizedBox(width: 2),
-                  Text(
-                    '${project.openTicketsCount}',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+      trailing: _buildProjectTrailing(project),
+      onTap: () => _showProjectDetails(project),
+    );
+  }
+
+  Widget _buildProjectTrailing(Project project) {
+    final taskStats = projectTaskStats[project.id];
+    
+    // Check if we have any statistics to show
+    final hasTickets = project.openTicketsCount > 0;
+    final hasTasks = taskStats != null && taskStats.totalTasks > 0;
+    
+    // If we have both tickets and tasks, use a column layout for mobile
+    if (hasTickets && hasTasks) {
+      return SizedBox(
+        width: 80,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Tickets row
+            _buildStatBadge(
+              '${project.openTicketsCount}',
+              Icons.confirmation_number,
+              Colors.orange,
+              'Tickets',
+            ),
+            const SizedBox(height: 4),
+            // Tasks row
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (taskStats.activeTasks > 0)
+                  _buildStatBadge(
+                    '${taskStats.activeTasks}',
+                    Icons.play_circle_outline,
+                    Colors.blue,
+                    'Active',
                   ),
-                ],
-              ),
+                if (taskStats.activeTasks > 0 && taskStats.completedTasks > 0)
+                  const SizedBox(width: 2),
+                if (taskStats.completedTasks > 0)
+                  _buildStatBadge(
+                    '${taskStats.completedTasks}',
+                    Icons.check_circle_outline,
+                    Colors.green,
+                    'Completed',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Single row layout for smaller amounts of data
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (hasTickets) ...[
+          _buildStatBadge(
+            '${project.openTicketsCount}',
+            Icons.confirmation_number,
+            Colors.orange,
+            'Tickets',
+          ),
+          const SizedBox(width: 4),
+        ],
+        if (hasTasks) ...[
+          if (taskStats.activeTasks > 0) ...[
+            _buildStatBadge(
+              '${taskStats.activeTasks}',
+              Icons.play_circle_outline,
+              Colors.blue,
+              'Active Tasks',
             ),
             const SizedBox(width: 4),
           ],
-          Icon(
-            Icons.chevron_right,
-            color: AppTheme.darkColor.withValues(alpha: 0.4),
-            size: 18,
-          ),
+          if (taskStats.completedTasks > 0) ...[
+            _buildStatBadge(
+              '${taskStats.completedTasks}',
+              Icons.check_circle_outline,
+              Colors.green,
+              'Completed Tasks',
+            ),
+            const SizedBox(width: 4),
+          ],
         ],
+        Icon(
+          Icons.chevron_right,
+          color: AppTheme.darkColor.withValues(alpha: 0.4),
+          size: 18,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatBadge(String count, IconData icon, Color color, String tooltip) {
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 10, color: color),
+            const SizedBox(width: 2),
+            Text(
+              count,
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
-      onTap: () => _showProjectDetails(project),
     );
   }
 
@@ -556,7 +653,7 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.folder_open_outlined,
+            Icons.inventory_2_outlined,
             size: 64,
             color: Colors.grey.shade400,
           ),
@@ -694,19 +791,6 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _getStatusColor(project.statusColor).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.folder,
-                      color: _getStatusColor(project.statusColor),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,6 +860,27 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
                           ),
                         ),
                       ],
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Create Ticket Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _navigateToCreateTicket(project),
+                        icon: const Icon(Icons.add_circle_outline),
+                        label: const Text('Create Ticket'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                      ),
                     ),
                     
                     const SizedBox(height: 20),
@@ -856,6 +961,25 @@ class _ClientProjectsScreenState extends State<ClientProjectsScreen>
         ],
       ),
     );
+  }
+
+  void _navigateToCreateTicket(Project project) {
+    // Close the project details modal first
+    Navigator.pop(context);
+    
+    // Navigate to create ticket screen with pre-selected project
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateTicketScreen(
+          user: widget.user,
+          preSelectedProject: project,
+        ),
+      ),
+    ).then((_) {
+      // Refresh the projects list when returning from create ticket
+      _loadClientProjects();
+    });
   }
 
   Color _getStatusColor(String statusColor) {

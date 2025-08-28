@@ -146,11 +146,9 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
         // Filter by search query
         if (query.isNotEmpty) {
           final title = (task['title'] ?? '').toString().toLowerCase();
-          final description = (task['description'] ?? '').toString().toLowerCase();
           final projectName = (task['project_name'] ?? '').toString().toLowerCase();
           
           return title.contains(query) || 
-                 description.contains(query) || 
                  projectName.contains(query);
         }
         
@@ -480,19 +478,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
     
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: statusColor.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          _getStatusIcon(status),
-          color: statusColor,
-          size: 24,
-        ),
-      ),
       title: Text(
         task['title'] ?? 'Untitled Task',
         style: const TextStyle(
@@ -505,17 +490,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 4),
-          if (task['description']?.isNotEmpty == true)
-            Text(
-              task['description'],
-              style: TextStyle(
-                color: AppTheme.darkColor.withValues(alpha: 0.6),
-                fontSize: 13,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -536,8 +510,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
               ),
               const SizedBox(width: 8),
               if (task['project_name']?.isNotEmpty == true) ...[
-                Icon(Icons.folder, size: 12, color: AppTheme.darkColor.withValues(alpha: 0.5)),
-                const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     task['project_name'],
@@ -773,19 +745,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
               ),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      _getStatusIcon(status),
-                      color: statusColor,
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -825,9 +784,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Task details
-                    _buildDetailRow('Description', task['description']?.isNotEmpty == true 
-                        ? task['description'] 
-                        : 'No description available'),
                     _buildDetailRow('Project', task['project_name'] ?? 'No project assigned'),
                     _buildDetailRow('Status', _getStatusDisplayName(status)),
                     _buildDetailRow('Created', '${createdAt.day}/${createdAt.month}/${createdAt.year}'),
@@ -891,21 +847,6 @@ class _ClientTasksScreenState extends State<ClientTasksScreen>
         return AppTheme.primaryColor;
       default:
         return Colors.grey;
-    }
-  }
-
-  IconData _getStatusIcon(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return Icons.schedule;
-      case 'in_progress':
-        return Icons.play_circle;
-      case 'completed':
-        return Icons.check_circle;
-      case 'cancelled':
-        return Icons.cancel;
-      default:
-        return Icons.task_alt;
     }
   }
 
