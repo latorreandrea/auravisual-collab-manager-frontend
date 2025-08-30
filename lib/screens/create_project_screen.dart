@@ -3,6 +3,7 @@ import '../models/user.dart';
 import '../services/project_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/constants.dart';
+import '../utils/validators.dart';
 
 /// Create Project screen - allows admin users to create new projects
 class CreateProjectScreen extends StatefulWidget {
@@ -123,13 +124,21 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
       context: context,
       builder: (context) {
         final controller = TextEditingController();
+        final formKey = GlobalKey<FormState>();
+        
         return AlertDialog(
           title: const Text('Add Social Link'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Social Media URL',
-              hintText: 'https://instagram.com/username',
+          content: Form(
+            key: formKey,
+            child: TextFormField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Social Media URL',
+                hintText: 'https://instagram.com/username or @username',
+                helperText: 'Enter a social media URL or username',
+              ),
+              validator: Validators.socialUrl,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
             ),
           ),
           actions: [
@@ -139,12 +148,26 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
             ),
             ElevatedButton(
               onPressed: () {
-                if (controller.text.isNotEmpty) {
+                if (formKey.currentState!.validate() && controller.text.trim().isNotEmpty) {
+                  String url = controller.text.trim();
+                  
+                  // Basic URL normalization
+                  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('@')) {
+                    // Add https:// if it looks like a URL but doesn't have protocol
+                    if (url.contains('.') && !url.startsWith('www.')) {
+                      url = 'https://$url';
+                    } else if (url.startsWith('www.')) {
+                      url = 'https://$url';
+                    }
+                  }
+                  
                   setState(() {
-                    _socialLinks.add(controller.text);
+                    _socialLinks.add(url);
                   });
+                  Navigator.pop(context);
+                } else if (controller.text.trim().isEmpty) {
+                  Navigator.pop(context);
                 }
-                Navigator.pop(context);
               },
               child: const Text('Add'),
             ),
@@ -193,12 +216,22 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
       Navigator.pop(context, true);
     }
   } catch (error) {
+    print('Create project error: $error'); // Debug log
     if (mounted) {
+      String errorMessage = 'Error creating project';
+      
+      // Try to extract meaningful error from the response
+      if (error.toString().contains('validation') || error.toString().contains('invalid')) {
+        errorMessage = 'Validation error: Please check all fields are valid';
+      } else if (error.toString().contains('social') || error.toString().contains('url')) {
+        errorMessage = 'URL validation error: Please check social links and website URL';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Error creating project: ${error.toString()}'),
+          content: Text('❌ $errorMessage\nDetails: ${error.toString()}'),
           backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
+          duration: const Duration(seconds: 6),
         ),
       );
     }
@@ -360,6 +393,7 @@ class _CreateProjectScreenState extends State<CreateProjectScreen>
               label: 'Website URL (Optional)',
               hint: 'https://client-website.com',
               icon: Icons.language,
+              validator: (value) => Validators.url(value, required: false),
             ),
             
             const SizedBox(height: 20),

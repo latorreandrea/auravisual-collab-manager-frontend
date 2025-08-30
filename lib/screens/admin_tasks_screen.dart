@@ -576,6 +576,7 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
     final priority = task['priority'] ?? 'medium';
     final taskId = task['id']?.toString() ?? '';
     final hasActiveTimer = activeTimer != null && activeTimer!['task_id'] == taskId;
+    final isPaused = hasActiveTimer && activeTimer!['status'] == 'paused';
     final isAssignedToMe = _isTaskAssignedToMe(task);
     final assignedToName = task['assigned_to_name'] ?? 'Unassigned';
     
@@ -688,31 +689,37 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
+                      color: (isPaused ? Colors.blue : Colors.orange).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.timer, size: 12, color: Colors.orange),
+                        Icon(
+                          isPaused ? Icons.pause : Icons.timer, 
+                          size: 12, 
+                          color: isPaused ? Colors.blue : Colors.orange
+                        ),
                         const SizedBox(width: 4),
                         Text(
-                          'ACTIVE',
+                          isPaused ? 'PAUSED' : 'ACTIVE',
                           style: TextStyle(
-                            color: Colors.orange,
+                            color: isPaused ? Colors.blue : Colors.orange,
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _getElapsedTime(activeTimer!['start_time']),
-                          style: TextStyle(
-                            color: Colors.orange.shade700,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
+                        if (!isPaused) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            _getElapsedTime(activeTimer!['start_time']),
+                            style: TextStyle(
+                              color: Colors.orange.shade700,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -748,16 +755,26 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
                 ),
               ),
             const SizedBox(width: 8),
-            // Time tracking button - only for admin's own tasks
-            if (!isCompleted && isAssignedToMe)
-              IconButton(
-                onPressed: () => _toggleTimer(task),
-                icon: Icon(
-                  hasActiveTimer ? Icons.stop : Icons.play_arrow,
-                  color: hasActiveTimer ? Colors.red : Colors.green,
+            // Time tracking buttons - only for admin's own tasks
+            if (!isCompleted && isAssignedToMe) ...[
+              // Resume button for paused timers
+              if (isPaused)
+                IconButton(
+                  onPressed: () => _resumeTimer(task),
+                  icon: Icon(Icons.play_arrow, color: Colors.green),
+                  tooltip: 'Resume timer',
+                )
+              else
+                // Start/Stop/Pause button for active or inactive timers
+                IconButton(
+                  onPressed: () => _toggleTimer(task),
+                  icon: Icon(
+                    hasActiveTimer ? Icons.pause : Icons.play_arrow,
+                    color: hasActiveTimer ? Colors.orange : Colors.green,
+                  ),
+                  tooltip: hasActiveTimer ? 'Timer options' : 'Start timer',
                 ),
-                tooltip: hasActiveTimer ? 'Stop timer' : 'Start timer',
-              ),
+            ],
             // Status toggle button - only for admin's own tasks
             if (isAssignedToMe) ...[
               if (!isCompleted)
@@ -800,21 +817,61 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
     
     try {
       if (hasActiveTimer) {
-        // Stop the timer
-        await TaskService.stopTaskTimer(taskId);
-        setState(() {
-          activeTimer = null;
-        });
+        // Show options for active timer
+        final action = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Timer Options'),
+            content: Text('Choose an action for timer on "${task['action']}"'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'cancel'),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'pause'),
+                child: const Text('⏸️ Pause'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'stop'),
+                child: const Text('⏹️ Stop'),
+              ),
+            ],
+          ),
+        );
         
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⏹️ Timer stopped for: ${task['action']}'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 2),
-            ),
-          );
+        if (action == 'stop') {
+          await TaskService.stopTaskTimer(taskId);
+          setState(() {
+            activeTimer = null;
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⏹️ Timer stopped for: ${task['action']}'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        } else if (action == 'pause') {
+          await TaskService.pauseTaskTimer(taskId, note: 'Paused by admin');
+          setState(() {
+            activeTimer!['status'] = 'paused';
+          });
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('⏸️ Timer paused for: ${task['action']}'),
+                backgroundColor: Colors.blue,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
         }
       } else {
         // Check if there's already an active timer for another task
@@ -851,6 +908,7 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
             'task_id': taskId,
             'task_title': task['action'],
             'start_time': DateTime.now().toIso8601String(),
+            'status': 'active',
           };
         });
         
@@ -873,6 +931,45 @@ class _AdminTasksScreenState extends State<AdminTasksScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Timer error: $error'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  // Resume paused timer
+  Future<void> _resumeTimer(Map<String, dynamic> task) async {
+    final taskId = task['id']?.toString() ?? '';
+    
+    try {
+      await TaskService.resumeTaskTimer(taskId, note: 'Resumed by admin');
+      setState(() {
+        if (activeTimer != null && activeTimer!['task_id'] == taskId) {
+          activeTimer!['status'] = 'active';
+        }
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('▶️ Timer resumed for: ${task['action']}'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+      // Reload tasks to get updated time
+      _loadAdminTasks();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Resume error: $error'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 3),

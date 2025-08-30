@@ -265,7 +265,7 @@ class TaskService {
     }
   }
 
-    /// Stop timer for a task - completes the active time tracking session
+  /// Stop timer for a task - completes the active time tracking session
   static Future<void> stopTaskTimer(String taskId) async {
     try {
       final token = await AuthService().getToken();
@@ -301,7 +301,83 @@ class TaskService {
     }
   }
 
-  /// Get time summary for current user's tasks
+  /// Pause timer for a task - temporarily stops time tracking session
+  static Future<void> pauseTaskTimer(String taskId, {String? note}) async {
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/tasks/$taskId/timer/pause'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          if (note != null) 'note': note,
+        }),
+      );
+
+      developer.log(
+        'Pause timer response - Status: ${response.statusCode}, Body: ${response.body}',
+        name: 'TaskService.pauseTaskTimer',
+      );
+
+      if (response.statusCode == 422) {
+        throw Exception('Validation error: ${response.body}');
+      } else if (response.statusCode != 200) {
+        throw Exception('Failed to pause task timer: HTTP ${response.statusCode} - ${response.body}');
+      }
+    } catch (error) {
+      developer.log(
+        'Pause timer error: $error',
+        name: 'TaskService.pauseTaskTimer',
+        error: error,
+      );
+      throw Exception('Error pausing task timer: $error');
+    }
+  }
+
+  /// Resume timer for a task - continues time tracking session after pause
+  static Future<void> resumeTaskTimer(String taskId, {String? note}) async {
+    try {
+      final token = await AuthService().getToken();
+      if (token == null) throw Exception('No authentication token found');
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/tasks/$taskId/timer/resume'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          if (note != null) 'note': note,
+        }),
+      );
+
+      developer.log(
+        'Resume timer response - Status: ${response.statusCode}, Body: ${response.body}',
+        name: 'TaskService.resumeTaskTimer',
+      );
+
+      if (response.statusCode == 422) {
+        throw Exception('Validation error: ${response.body}');
+      } else if (response.statusCode != 200) {
+        throw Exception('Failed to resume task timer: HTTP ${response.statusCode} - ${response.body}');
+      }
+    } catch (error) {
+      developer.log(
+        'Resume timer error: $error',
+        name: 'TaskService.resumeTaskTimer',
+        error: error,
+      );
+      throw Exception('Error resuming task timer: $error');
+    }
+  }
+
+  /// Get time summary for current user's tasks (includes active timer info)
   static Future<Map<String, dynamic>> getMyTimeSummary() async {
     try {
       final token = await AuthService().getToken();
@@ -323,11 +399,42 @@ class TaskService {
       }
     } catch (error) {
       developer.log(
-        'Get time summary error: $error',
+        'Time summary error: $error',
         name: 'TaskService.getMyTimeSummary',
         error: error,
       );
       throw Exception('Error getting time summary: $error');
+    }
+  }
+
+  /// Check if user has an active timer for any task using time summary
+  static Future<Map<String, dynamic>?> getActiveTimer() async {
+    try {
+      final timeSummary = await getMyTimeSummary();
+      final tasks = timeSummary['tasks'] as List<dynamic>? ?? [];
+      
+      // Find task with active timer
+      for (final task in tasks) {
+        final hasActiveTimer = task['has_active_timer'] == true;
+        if (hasActiveTimer) {          
+          return {
+            'task_id': task['task_id'],
+            'task_title': task['task_title'],
+            'start_time': DateTime.now().toIso8601String(),
+            'status': 'active', // Default to active, UI will manage pause state locally
+          };
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      developer.log(
+        'Get active timer error: $error',
+        name: 'TaskService.getActiveTimer',
+        error: error,
+      );
+      // Return null instead of throwing error to allow graceful handling
+      return null;
     }
   }
 
@@ -360,41 +467,6 @@ class TaskService {
         error: error,
       );
       throw Exception('Error getting task time logs: $error');
-    }
-  }
-
-  /// Check if user has an active timer for any task
-  static Future<Map<String, dynamic>?> getActiveTimer() async {
-    try {
-      final token = await AuthService().getToken();
-      if (token == null) throw Exception('No authentication token found');
-
-      final response = await http.get(
-        Uri.parse('$_baseUrl/tasks/my/active-timer'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = json.decode(response.body);
-        return responseData['active_timer'];
-      } else if (response.statusCode == 404) {
-        // No active timer found
-        return null;
-      } else {
-        throw Exception('Failed to get active timer: HTTP ${response.statusCode}');
-      }
-    } catch (error) {
-      developer.log(
-        'Get active timer error: $error',
-        name: 'TaskService.getActiveTimer',
-        error: error,
-      );
-      // Return null instead of throwing error to allow graceful handling
-      return null;
     }
   }
 
